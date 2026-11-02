@@ -224,6 +224,13 @@ class ViewCoordinator(QObject):
             self._quick_visualizer_view.set_selected_column(column)
         self.switch_to(ViewRegistry.VIEW_VISUALIZER)
 
+    def refresh_theme(self) -> None:
+        """Repintar las vistas que fijan colores en tiempo de construcción."""
+        for view in self._views.values():
+            refresh = getattr(view, 'refresh_theme', None)
+            if callable(refresh):
+                refresh()
+
     def set_column_visibility_enabled(self, enabled: bool) -> None:
         if self._data_view is not None:
             self._data_view.set_column_visibility_enabled(enabled)

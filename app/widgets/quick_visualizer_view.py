@@ -16,12 +16,14 @@ from PySide6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel,
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-_BG_COLOR = "#282c34"
-_BORDER_COLOR = "#2c313a"
-_BODY_COLOR = "#dddddd"
-_MUTED_COLOR = "#717e95"
-_TITLE_COLOR = "#dddddd"
-_WHITE = "#343b48"
+from app.theme import current_theme
+from app.theme.palette import ThemePalette, get_palette
+
+
+def _palette() -> ThemePalette:
+    """Paleta activa: se relee en cada repintado para seguir al tema."""
+    return get_palette(current_theme())
+
 
 _CHART_TYPES: list[tuple[str, str]] = [
     ("Histograma (Distribución)", "histogram"),
@@ -39,29 +41,24 @@ class QuickVisualizerView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._df: pd.DataFrame | None = None
+        self._placeholder_message = 'Carga un archivo para explorar sus datos gráficamente.'
         self._fig: Figure
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setStyleSheet(f"background-color: {_BG_COLOR};")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
 
-        header = QLabel("Visualizador Rápido")
-        header.setStyleSheet(f"color: {_TITLE_COLOR}; font-size: 14px; font-weight: bold;")
-        layout.addWidget(header)
+        self._header = QLabel("Visualizador Rápido")
+        self._header.setStyleSheet(
+            f"color: {_palette().text}; font-size: 14px; font-weight: bold;"
+        )
+        layout.addWidget(self._header)
 
         # --- PANEL DE CONTROLES ---
-        controls_frame = QFrame()
-        controls_frame.setStyleSheet(
-            f"QFrame {{ background-color: {_WHITE}; border: 1px solid {_BORDER_COLOR}; "
-            f"border-radius: 8px; }}"
-            f"QLabel {{ color: {_MUTED_COLOR}; font-size: 12px; border: none; }}"
-            f"QComboBox {{ border: 1px solid {_BORDER_COLOR}; border-radius: 4px; "
-            f"padding: 4px 8px; background: {_BG_COLOR}; font-size: 12px; "
-            f"color: {_BODY_COLOR}; }}"
-        )
+        self._controls_frame = QFrame()
+        controls_frame = self._controls_frame
         controls_layout = QHBoxLayout(controls_frame)
         controls_layout.setContentsMargins(12, 8, 12, 8)
         controls_layout.setSpacing(8)
@@ -87,16 +84,47 @@ class QuickVisualizerView(QWidget):
         layout.addWidget(controls_frame)
 
         # --- CANVAS DE MATPLOTLIB ---
-        self._fig = Figure(figsize=(6, 4), facecolor=_BG_COLOR, dpi=100)
+        self._fig = Figure(figsize=(6, 4), facecolor=_palette().app_bg, dpi=100)
         self._canvas = FigureCanvas(self._fig)
-        self._canvas.setStyleSheet("background-color: transparent;")
         layout.addWidget(self._canvas, 1)
 
         self._status_label = QLabel("Selecciona un tipo de gráfico y columnas para visualizar.")
-        self._status_label.setStyleSheet(f"color: {_MUTED_COLOR}; font-size: 12px;")
         layout.addWidget(self._status_label)
 
+        self._apply_styles()
         self.show_placeholder("Carga un archivo para explorar sus datos gráficamente.")
+
+    # ==================== TEMA ====================
+
+    def _apply_styles(self) -> None:
+        """Repintar el chrome de la vista con la paleta activa."""
+        tokens = _palette()
+        self.setStyleSheet(f"background-color: {tokens.app_bg};")
+        self._header.setStyleSheet(
+            f"color: {tokens.text}; font-size: 14px; font-weight: bold;"
+        )
+        self._controls_frame.setStyleSheet(
+            f"QFrame {{ background-color: {tokens.surface}; border: 1px solid {tokens.border}; "
+            f"border-radius: 8px; }}"
+            f"QLabel {{ color: {tokens.text_muted}; font-size: 12px; border: none; }}"
+            f"QComboBox {{ border: 1px solid {tokens.border}; border-radius: 4px; "
+            f"padding: 4px 8px; background: {tokens.app_bg}; font-size: 12px; "
+            f"color: {tokens.text}; }}"
+        )
+        self._canvas.setStyleSheet("background-color: transparent;")
+        self._status_label.setStyleSheet(
+            f"color: {tokens.text_muted}; font-size: 12px;"
+        )
+        self._fig.set_facecolor(tokens.app_bg)
+        self._canvas.draw_idle()
+
+    def refresh_theme(self) -> None:
+        """Aplicar el tema nuevo y redibujar el canvas."""
+        self._apply_styles()
+        if self._df is not None:
+            self._on_columns_changed()
+        else:
+            self.show_placeholder(getattr(self, '_placeholder_message', ''))
 
     # ==================== DATOS Y CONFIGURACIÓN ====================
 
@@ -146,11 +174,12 @@ class QuickVisualizerView(QWidget):
 
     def show_placeholder(self, message: str) -> None:
         """Mostrar un mensaje central en lugar del gráfico."""
+        self._placeholder_message = message
         self._fig.clear()
         ax = self._fig.add_subplot(111)
         ax.axis('off')
         ax.text(0.5, 0.5, message, ha='center', va='center',
-                color=_MUTED_COLOR, fontsize=11)
+                color=_palette().text_muted, fontsize=11)
         self._fig.tight_layout()
         self._status_label.setText("")
         self._canvas.draw()

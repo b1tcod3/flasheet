@@ -83,3 +83,92 @@ def test_toggle_theme_switches_and_returns_back() -> None:
 
     assert toggle_theme(app) == 'dark'
     assert app.palette().color(QPalette.ColorRole.Window).name() == DARK.app_bg
+
+
+class TestViewThemeRefresh:
+    """Las vistas que fijan colores al construirse deben repintarse."""
+
+    @staticmethod
+    def _app() -> QApplication:
+        return QApplication.instance() or QApplication([])
+
+    def test_profiling_view_repaints_on_theme_change(self) -> None:
+        from app.widgets.profiling_view import ProfilingView
+
+        app = self._app()
+        apply_theme(app, 'dark')
+        view = ProfilingView()
+
+        dark_style = view._header.styleSheet()
+        assert DARK.text in dark_style
+
+        apply_theme(app, 'light')
+        view.refresh_theme()
+
+        assert LIGHT.text in view._header.styleSheet()
+        assert view._header.styleSheet() != dark_style
+
+    def test_profiling_view_rebuilds_cards(self) -> None:
+        from app.widgets.profiling_view import ProfilingView
+
+        app = self._app()
+        apply_theme(app, 'dark')
+        view = ProfilingView()
+        view.set_profile({
+            'total_rows': 10,
+            'total_columns': 1,
+            'columns': {
+                'importe': {
+                    'dtype': 'int64',
+                    'null_count': 0,
+                    'null_percent': 0.0,
+                    'unique_count': 10,
+                    'unique_percent': 100.0,
+                },
+            },
+            'memory_usage_mb': 0.1,
+            'duplicated_rows': 0,
+            'data_quality_summary': {},
+        })
+        cards_dark = view._cards_layout.count()
+
+        apply_theme(app, 'light')
+        view.refresh_theme()
+
+        assert view._cards_layout.count() == cards_dark
+
+    def test_visualizer_repaints_on_theme_change(self) -> None:
+        from app.widgets.quick_visualizer_view import QuickVisualizerView
+
+        app = self._app()
+        apply_theme(app, 'dark')
+        view = QuickVisualizerView()
+
+        dark_style = view._header.styleSheet()
+        assert DARK.text in dark_style
+
+        apply_theme(app, 'light')
+        view.refresh_theme()
+
+        assert LIGHT.text in view._header.styleSheet()
+
+    def test_view_coordinator_refreshes_views(self) -> None:
+        from app.view_manager.view_coordinator import ViewCoordinator
+
+        app = self._app()
+        apply_theme(app, 'dark')
+
+        class FakeView:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def refresh_theme(self) -> None:
+                self.calls += 1
+
+        coordinator = ViewCoordinator()
+        fake = FakeView()
+        coordinator._views[0] = fake  # type: ignore[assignment]
+
+        coordinator.refresh_theme()
+
+        assert fake.calls == 1

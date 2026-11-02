@@ -239,6 +239,7 @@ class MainWindow(ShellWindow):
             return
         theme = toggle_theme(cast(QApplication, instance))
         self.right_panel.set_theme_name(theme)
+        self.view_coordinator.refresh_theme()
 
     # ==================== SEÑALES ====================
 

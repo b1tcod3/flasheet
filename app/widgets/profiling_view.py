@@ -14,17 +14,15 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from app.resources import get_asset_path
+from app.theme import current_theme
+from app.theme.palette import ThemePalette, get_palette
 from app.widgets.widget_utils import dispose_widget
 
-_BG_COLOR = "#282c34"
-_BORDER_COLOR = "#2c313a"
-_BAR_COLOR = "#717e95"
-_TRACK_COLOR = "#2c313a"
-_BODY_COLOR = "#334155"
-_MUTED_COLOR = "#717e95"
-_TITLE_COLOR = "#dddddd"
-_ERROR_COLOR = "#b45309"
-_WHITE = "#343b48"
+
+def _palette() -> ThemePalette:
+    """Paleta activa: se relee en cada repintado para seguir al tema."""
+    return get_palette(current_theme())
+
 
 _MAX_VALUE_LENGTH = 40
 
@@ -44,7 +42,7 @@ class _PercentBar(QWidget):
         self._bar = QFrame()
         self._bar.setFixedHeight(6)
         self._bar.setStyleSheet(
-            f"QFrame {{ background-color: {_TRACK_COLOR}; border: none; "
+            f"QFrame {{ background-color: {_palette().border}; border: none; "
             f"border-radius: 3px; }}"
         )
         layout.addWidget(self._bar, 1)
@@ -52,13 +50,13 @@ class _PercentBar(QWidget):
         self._label = QLabel(f"{percent:.1f}%")
         self._label.setFixedWidth(52)
         self._label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._label.setStyleSheet(f"color: {_BODY_COLOR}; font-size: 11px;")
+        self._label.setStyleSheet(f"color: {_palette().text}; font-size: 11px;")
         layout.addWidget(self._label)
 
         self._fill = QFrame(self._bar)
         self._fill.setFixedHeight(6)
         self._fill.setStyleSheet(
-            f"QFrame {{ background-color: {_BAR_COLOR}; border: none; "
+            f"QFrame {{ background-color: {_palette().accent}; border: none; "
             f"border-radius: 3px; }}"
         )
         self._fill.setGeometry(0, 0, 0, 6)
@@ -84,31 +82,23 @@ class ProfilingView(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setStyleSheet(f"background-color: {_BG_COLOR};")
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 16, 20, 16)
         main_layout.setSpacing(12)
 
-        header = QLabel("Perfil de Datos")
-        header.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        header.setStyleSheet(f"color: {_TITLE_COLOR};")
-        main_layout.addWidget(header)
+        self._header = QLabel("Perfil de Datos")
+        self._header.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        main_layout.addWidget(self._header)
 
         self._summary_label = QLabel("")
-        self._summary_label.setStyleSheet(f"color: {_MUTED_COLOR}; font-size: 12px;")
         main_layout.addWidget(self._summary_label)
 
         self._status_label = QLabel("Carga un archivo para ver su perfil de datos.")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._status_label.setStyleSheet(f"color: {_MUTED_COLOR}; font-size: 13px;")
         main_layout.addWidget(self._status_label)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        self._scroll.setStyleSheet(
-            f"QScrollArea {{ border: none; background: transparent; }}"
-            f"QScrollArea > QWidget > QWidget {{ background: {_BG_COLOR}; }}"
-        )
         self._cards_widget = QWidget()
         self._cards_layout = QVBoxLayout(self._cards_widget)
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -118,6 +108,27 @@ class ProfilingView(QWidget):
         main_layout.addWidget(self._scroll, 1)
 
         self._scroll.setVisible(False)
+        self._apply_styles()
+
+    # ==================== TEMA ====================
+
+    def _apply_styles(self) -> None:
+        """Repintar el chrome de la vista con la paleta activa."""
+        tokens = _palette()
+        self.setStyleSheet(f"background-color: {tokens.app_bg};")
+        self._header.setStyleSheet(f"color: {tokens.text};")
+        self._summary_label.setStyleSheet(f"color: {tokens.text_muted}; font-size: 12px;")
+        self._status_label.setStyleSheet(f"color: {tokens.text_muted}; font-size: 13px;")
+        self._scroll.setStyleSheet(
+            f"QScrollArea {{ border: none; background: transparent; }}"
+            f"QScrollArea > QWidget > QWidget {{ background: {tokens.app_bg}; }}"
+        )
+
+    def refresh_theme(self) -> None:
+        """Aplicar el tema nuevo y reconstruir las tarjetas si hay perfil."""
+        self._apply_styles()
+        if self._profile:
+            self.set_profile(self._profile)
 
     # ==================== ESTADOS ====================
 
@@ -193,7 +204,7 @@ class ProfilingView(QWidget):
         """Línea divisoria sutil para organizar el contenido de la tarjeta."""
         line = QFrame()
         line.setFixedHeight(1)
-        line.setStyleSheet(f"background-color: {_BORDER_COLOR}; border: none;")
+        line.setStyleSheet(f"background-color: {_palette().border}; border: none;")
         return line
 
     def _create_column_card(self, name: str, profile: dict[str, Any]) -> QFrame:
@@ -202,7 +213,7 @@ class ProfilingView(QWidget):
 
         card = QFrame()
         card.setStyleSheet(
-            f"QFrame {{ background-color: {_WHITE}; border: 1px solid {_BORDER_COLOR}; "
+            f"QFrame {{ background-color: {_palette().surface}; border: 1px solid {_palette().border}; "
             f"border-radius: 8px; }}"
         )
         layout = QVBoxLayout(card)
@@ -212,14 +223,14 @@ class ProfilingView(QWidget):
         header = QHBoxLayout()
         name_label = QLabel(name)
         name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        name_label.setStyleSheet(f"color: {_TITLE_COLOR}; border: none;")
+        name_label.setStyleSheet(f"color: {_palette().text}; border: none;")
         header.addWidget(name_label)
         header.addStretch()
         self._add_visualize_button(header, name)
         dtype_label = QLabel(profile.get('dtype', ''))
         dtype_label.setStyleSheet(
-            f"color: {_MUTED_COLOR}; font-size: 11px; background: {_BG_COLOR}; "
-            f"border: 1px solid {_BORDER_COLOR}; border-radius: 4px; padding: 2px 8px;"
+            f"color: {_palette().text_muted}; font-size: 11px; background: {_palette().app_bg}; "
+            f"border: 1px solid {_palette().border}; border-radius: 4px; padding: 2px 8px;"
         )
         header.addWidget(dtype_label)
         layout.addLayout(header)
@@ -287,8 +298,8 @@ class ProfilingView(QWidget):
         btn.setStyleSheet(
             f"QPushButton {{ background: transparent; border: 1px solid transparent; "
             f"border-radius: 4px; }}"
-            f"QPushButton:hover {{ background: {_BG_COLOR}; border-color: {_BORDER_COLOR}; }}"
-            f"QPushButton:pressed {{ background: {_BORDER_COLOR}; }}"
+            f"QPushButton:hover {{ background: {_palette().app_bg}; border-color: {_palette().border}; }}"
+            f"QPushButton:pressed {{ background: {_palette().border}; }}"
         )
         btn.clicked.connect(lambda: self.visualize_requested.emit(name))
         header.addWidget(btn)
@@ -298,7 +309,7 @@ class ProfilingView(QWidget):
     def _create_error_card(name: str, error_msg: str) -> QFrame:
         card = QFrame()
         card.setStyleSheet(
-            f"QFrame {{ background-color: {_WHITE}; border: 1px solid {_BORDER_COLOR}; "
+            f"QFrame {{ background-color: {_palette().surface}; border: 1px solid {_palette().border}; "
             f"border-radius: 8px; }}"
         )
         layout = QVBoxLayout(card)
@@ -308,12 +319,12 @@ class ProfilingView(QWidget):
         header = QHBoxLayout()
         name_label = QLabel(name)
         name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        name_label.setStyleSheet(f"color: {_TITLE_COLOR}; border: none;")
+        name_label.setStyleSheet(f"color: {_palette().text}; border: none;")
         header.addWidget(name_label)
         header.addStretch()
         badge = QLabel("error")
         badge.setStyleSheet(
-            f"color: {_ERROR_COLOR}; font-size: 11px; background: #fef3c7; "
+            f"color: {_palette().danger}; font-size: 11px; background: #fef3c7; "
             f"border: 1px solid #fde68a; border-radius: 4px; padding: 2px 8px;"
         )
         header.addWidget(badge)
@@ -322,7 +333,7 @@ class ProfilingView(QWidget):
         error_label = QLabel(error_msg)
         error_label.setWordWrap(True)
         error_label.setStyleSheet(
-            f"color: {_ERROR_COLOR}; font-size: 12px; border: none; margin-top: 4px;"
+            f"color: {_palette().danger}; font-size: 12px; border: none; margin-top: 4px;"
         )
         layout.addWidget(error_label)
 
@@ -331,13 +342,13 @@ class ProfilingView(QWidget):
     @staticmethod
     def _metric_label(text: str) -> QLabel:
         label = QLabel(text)
-        label.setStyleSheet(f"color: {_MUTED_COLOR}; font-size: 12px; border: none;")
+        label.setStyleSheet(f"color: {_palette().text_muted}; font-size: 12px; border: none;")
         return label
 
     def _numeric_stats_grid(self, stats: dict[str, Any]) -> QFrame:
         frame = QFrame()
         frame.setStyleSheet(
-            f"QFrame {{ background-color: {_BG_COLOR}; border: 1px solid {_BORDER_COLOR}; "
+            f"QFrame {{ background-color: {_palette().app_bg}; border: 1px solid {_palette().border}; "
             f"border-radius: 6px; }}"
         )
         grid = QGridLayout(frame)
@@ -363,11 +374,11 @@ class ProfilingView(QWidget):
             value = stats.get(key)
             title_label = QLabel(title)
             title_label.setStyleSheet(
-                f"color: {_MUTED_COLOR}; font-size: 10px; border: none;"
+                f"color: {_palette().text_muted}; font-size: 10px; border: none;"
             )
             value_label = QLabel(self._format_value(value, fmt))
             value_label.setStyleSheet(
-                f"color: {_BODY_COLOR}; font-size: 11px; font-weight: 600; border: none;"
+                f"color: {_palette().text}; font-size: 11px; font-weight: 600; border: none;"
             )
             grid.addWidget(title_label, row_offset, col_index)
             grid.addWidget(value_label, row_offset + 1, col_index)
@@ -383,7 +394,7 @@ class ProfilingView(QWidget):
 
         title = QLabel(title_text)
         title.setStyleSheet(
-            f"color: {_MUTED_COLOR}; font-size: 11px; border: none; font-weight: bold;"
+            f"color: {_palette().text_muted}; font-size: 11px; border: none; font-weight: bold;"
         )
         layout.addWidget(title)
 
@@ -398,12 +409,12 @@ class ProfilingView(QWidget):
                 value_str = value_str[:_MAX_VALUE_LENGTH - 3] + "..."
 
             value_label = QLabel(value_str)
-            value_label.setStyleSheet(f"color: {_BODY_COLOR}; font-size: 11px; border: none;")
+            value_label.setStyleSheet(f"color: {_palette().text}; font-size: 11px; border: none;")
 
             count_label = QLabel(f"{count:,}")
             count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             count_label.setStyleSheet(
-                f"color: {_MUTED_COLOR}; font-size: 11px; border: none; "
+                f"color: {_palette().text_muted}; font-size: 11px; border: none; "
                 f"font-family: monospace;"
             )
             grid.addWidget(value_label, row_idx, 0)
