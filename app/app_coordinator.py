@@ -25,8 +25,8 @@ from app.widgets.export_dialog import ExportDialog, ExportFormat, prompt_table_n
 from app.services.task_thread import stop_thread
 from app.widgets.progress_dialog import create_progress_dialog
 from app.view_manager import ViewCoordinator, ViewRegistry
-from app.toolbar import ToolbarManager
 from app.widgets import JoinDialog, FolderLoadDialog, CSVSeparatorDialog, ExcelSheetDialog
+from app.shell.side_bar import SideBar
 from core.join.models import JoinResult
 from core.models.folder_load_config import FolderLoadConfig
 from core.join.join_history import JoinHistory
@@ -61,7 +61,7 @@ class AppCoordinator(QObject):
     
     def __init__(self, parent_window: 'QMainWindow', data_service: DataService, export_service: ExportService, 
                  pivot_service: PivotService, cleaning_service: CleaningService,
-                 view_coordinator: ViewCoordinator, toolbar_manager: ToolbarManager, join_history: JoinHistory,
+                 view_coordinator: ViewCoordinator, navigation: SideBar, join_history: JoinHistory,
                  recent_files_service: RecentFilesService, join_service: JoinService) -> None:
         """Inicializar el coordinador"""
         super().__init__(parent_window)
@@ -72,7 +72,7 @@ class AppCoordinator(QObject):
         self.pivot_service = pivot_service
         self.cleaning_service = cleaning_service
         self.view_coordinator = view_coordinator
-        self.toolbar_manager = toolbar_manager
+        self.navigation = navigation
         self.join_history = join_history
         self.recent_files_service = recent_files_service
         self.join_service = join_service
@@ -430,7 +430,7 @@ class AppCoordinator(QObject):
                 self.join_history.add_entry(left_name, right_name, 
                                            result.config, result)
             
-            self.toolbar_manager.set_view_buttons_enabled(True)
+            self.navigation.set_view_buttons_enabled(True)
             self.view_coordinator.switch_to(ViewRegistry.VIEW_JOIN)
             self.status_message.emit(
                 f"Cruce completado: {result.metadata.result_rows} filas")
@@ -781,22 +781,14 @@ class AppCoordinator(QObject):
         self._visualizer_thread = None
         self._multi_session = None
 
-        # 1. Desconectar señales de manera segura
-        for sig in (self.status_message, self.datos_originales_cargados,
-                    self.datos_actualizados, self.datos_disponibles):
-            try:
-                sig.disconnect()
-            except RuntimeError:
-                pass
-
-        # 2. Liberar join_history
+        # 1. Liberar join_history
         self.join_history = None  # type: ignore[assignment]
 
-        # 3. Liberar referencias a componentes
+        # 2. Liberar referencias a componentes
         self.view_coordinator = None  # type: ignore[assignment]
-        self.toolbar_manager = None  # type: ignore[assignment]
+        self.navigation = None  # type: ignore[assignment]
 
-        # 4. Limpiar tareas pendientes del ThreadPool global
+        # 3. Limpiar tareas pendientes del ThreadPool global
         from PySide6.QtCore import QThreadPool
         pool = QThreadPool.globalInstance()
         if pool is not None:

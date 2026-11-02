@@ -16,15 +16,15 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel,
 from app.resources import get_asset_path
 from app.widgets.widget_utils import dispose_widget
 
-_BG_COLOR = "#f8fafc"
-_BORDER_COLOR = "#e2e8f0"
-_BAR_COLOR = "#94a3b8"
-_TRACK_COLOR = "#e2e8f0"
+_BG_COLOR = "#282c34"
+_BORDER_COLOR = "#2c313a"
+_BAR_COLOR = "#717e95"
+_TRACK_COLOR = "#2c313a"
 _BODY_COLOR = "#334155"
-_MUTED_COLOR = "#64748b"
-_TITLE_COLOR = "#1e293b"
+_MUTED_COLOR = "#717e95"
+_TITLE_COLOR = "#dddddd"
 _ERROR_COLOR = "#b45309"
-_WHITE = "#ffffff"
+_WHITE = "#343b48"
 
 _MAX_VALUE_LENGTH = 40
 

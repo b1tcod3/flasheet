@@ -16,12 +16,12 @@ from PySide6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel,
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-_BG_COLOR = "#f8fafc"
-_BORDER_COLOR = "#e2e8f0"
-_BODY_COLOR = "#1e293b"
-_MUTED_COLOR = "#64748b"
-_TITLE_COLOR = "#1e293b"
-_WHITE = "#ffffff"
+_BG_COLOR = "#282c34"
+_BORDER_COLOR = "#2c313a"
+_BODY_COLOR = "#dddddd"
+_MUTED_COLOR = "#717e95"
+_TITLE_COLOR = "#dddddd"
+_WHITE = "#343b48"
 
 _CHART_TYPES: list[tuple[str, str]] = [
     ("Histograma (Distribución)", "histogram"),

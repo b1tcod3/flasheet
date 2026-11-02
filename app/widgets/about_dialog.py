@@ -64,7 +64,7 @@ class AboutDialog(QDialog):
         title_layout.addWidget(title_label)
         
         version_label = QLabel(f"Versión {self.VERSION}")
-        version_label.setStyleSheet("font-size: 12px; color: #666;")
+        version_label.setStyleSheet("font-size: 12px; color: #717e95;")
         title_layout.addWidget(version_label)
         
         header_layout.addLayout(title_layout)
@@ -130,7 +130,7 @@ class AboutDialog(QDialog):
         creator_label = QLabel(creator_text)
         creator_label.setWordWrap(True)
         creator_label.setTextFormat(Qt.TextFormat.RichText)
-        creator_label.setStyleSheet("background-color: #f0f0f0; color: #333333; padding: 10px; border-radius: 5px;")
+        creator_label.setStyleSheet("background-color: #21252b; color: #dddddd; padding: 10px; border-radius: 5px;")
         layout.addWidget(creator_label)
     
     def _create_buttons(self, layout: QVBoxLayout) -> None:

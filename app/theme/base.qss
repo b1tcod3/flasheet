@@ -1,0 +1,690 @@
+/* ============================================================
+   Tema del shell (base común; los colores vienen de palette.py)
+
+   Estructura inspirada en PyDracula de Wanderson M. Pimenta (MIT):
+   https://github.com/Wanderson-Magalhaes/Modern_GUI_PyDracula_PySide6_or_PyQt6
+   Adaptada a los objectName de FlashSheet.
+
+   Plantilla con string.Template: cada marcador de color se sustituye por tema.
+   ============================================================ */
+
+QWidget {
+    color: $text;
+    font-size: 10pt;
+}
+
+QToolTip {
+    color: $text;
+    background-color: $menu_bg;
+    border: 1px solid $border;
+    border-left: 3px solid $accent_pink;
+    padding: 5px 9px;
+}
+
+/* ---------- Raíz ---------- */
+#bgApp {
+    background-color: $app_bg;
+    border: 1px solid $border;
+}
+
+/* ---------- Barra de título ---------- */
+#titleBar {
+    background-color: $menu_bg;
+    border-bottom: 1px solid $border;
+}
+
+#titleLeftApp {
+    color: $text;
+    font-size: 11pt;
+    font-weight: 600;
+}
+
+#titleLeftDescription {
+    color: $text_muted;
+    font-size: 9pt;
+}
+
+#windowButtons QPushButton {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+}
+
+#windowButtons QPushButton:hover {
+    background-color: $surface;
+}
+
+#closeAppBtn:hover {
+    background-color: $danger;
+}
+
+/* ---------- Sidebar ---------- */
+#leftMenuBg {
+    background-color: $menu_bg;
+    border: none;
+}
+
+#topLogo {
+    background-color: $menu_bg;
+    border: none;
+}
+
+#sideBarBtn, #sideBarAction {
+    background: transparent;
+    border: none;
+    border-left: 0px solid transparent;
+    color: $text_muted;
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10pt;
+}
+
+#sideBarBtn:hover, #sideBarAction:hover {
+    color: $text;
+    background-color: $surface;
+}
+
+#sideBarBtn:checked {
+    color: $text;
+    background-color: $selected_bg;
+    border-left: 6px solid $accent_pink;
+}
+
+#sideBarBtn:disabled, #sideBarAction:disabled {
+    color: $border;
+}
+
+#sideBarDivider {
+    background-color: $border;
+    max-height: 1px;
+    border: none;
+}
+
+#toggleLeftBox, #settingsTopBtn, #iconBtn {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+}
+
+#toggleLeftBox:hover, #settingsTopBtn:hover, #iconBtn:hover {
+    background-color: $surface;
+}
+
+#toggleLeftBox:checked, #settingsTopBtn:checked {
+    background-color: $accent;
+}
+
+/* ---------- Paneles laterales ---------- */
+#extraLeftBox, #extraRightBox {
+    background-color: $menu_bg;
+    border: none;
+}
+
+#extraTopBg {
+    background-color: $surface;
+    border: none;
+}
+
+#extraTitle {
+    color: $text;
+    font-size: 11pt;
+    font-weight: 600;
+}
+
+#recentList {
+    background: transparent;
+    border: none;
+    color: $text;
+    outline: none;
+}
+
+#recentList::item {
+    color: $text;
+    padding: 6px;
+    border-radius: 4px;
+}
+
+#recentList::item:hover {
+    background-color: $surface;
+}
+
+#recentList::item:selected {
+    background-color: $selected_bg;
+    color: $accent;
+}
+
+/* ---------- Contenido ---------- */
+#contentBox {
+    background-color: $app_bg;
+    border: none;
+}
+
+#contentTopBg {
+    background-color: $menu_bg;
+    border-bottom: 1px solid $border;
+}
+
+#contentTitle {
+    color: $text;
+    font-size: 13pt;
+    font-weight: 700;
+}
+
+#contentDescription {
+    color: $text_muted;
+    font-size: 9pt;
+}
+
+#pages {
+    background: transparent;
+}
+
+#bottomBar {
+    background-color: $menu_bg;
+    border-top: 1px solid $border;
+}
+
+#bottomBar QLabel {
+    color: $text_muted;
+}
+
+/* ---------- Tarjetas y superficies de las vistas ---------- */
+#card, #searchFrame, #paginationFrame {
+    background-color: $menu_bg;
+    border: 1px solid $border;
+    border-radius: 8px;
+}
+
+#mutedLabel {
+    color: $text_muted;
+}
+
+#sectionTitle {
+    color: $text;
+    font-size: 12pt;
+    font-weight: 600;
+}
+
+#segmentButton {
+    background-color: $menu_bg;
+    color: $text_muted;
+    border: 1px solid $border;
+    padding: 5px 14px;
+    font-weight: 500;
+    font-size: 9pt;
+}
+
+#segmentButton:hover {
+    background-color: $surface;
+}
+
+#segmentButton:checked {
+    background-color: $surface_hover;
+    color: $accent;
+    border-color: $accent;
+}
+
+/* ---------- Entradas ---------- */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
+    background-color: $input_bg;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 4px;
+    padding: 4px 8px;
+    selection-background-color: $accent;
+    selection-color: $menu_bg;
+}
+
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QTextEdit:focus {
+    border: 1px solid $accent;
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {
+    color: $text_muted;
+    background-color: $menu_bg;
+}
+
+QComboBox QAbstractItemView {
+    background-color: $input_bg;
+    color: $text;
+    border: 1px solid $border;
+    outline: none;
+    selection-background-color: $surface;
+    selection-color: $text;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+/* ---------- Botones ---------- */
+QPushButton {
+    background-color: $surface;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 4px;
+    padding: 6px 12px;
+}
+
+QPushButton:hover {
+    background-color: $surface_hover;
+}
+
+QPushButton:pressed {
+    background-color: $accent;
+    color: $menu_bg;
+}
+
+QPushButton:disabled {
+    color: $text_muted;
+    background-color: $menu_bg;
+    border-color: $menu_bg;
+}
+
+QPushButton#primaryBtn {
+    background-color: $accent;
+    color: $menu_bg;
+    border: none;
+    font-weight: 600;
+}
+
+QPushButton#primaryBtn:hover {
+    background-color: $accent_pink;
+}
+
+QPushButton#primaryBtn:disabled {
+    background-color: $surface;
+    color: $text_muted;
+}
+
+/* ---------- Tabla ---------- */
+QTableView {
+    background-color: $app_bg;
+    alternate-background-color: $menu_bg;
+    color: $text;
+    gridline-color: $border;
+    border: 1px solid $border;
+    border-radius: 6px;
+    selection-background-color: $surface;
+    selection-color: $accent;
+    outline: none;
+}
+
+QTableView::item {
+    padding: 6px 8px;
+    border-bottom: 1px solid $border;
+}
+
+QTableView::item:selected {
+    background-color: $surface;
+    color: $accent;
+}
+
+QHeaderView::section {
+    background-color: $menu_bg;
+    color: $text;
+    border: none;
+    border-right: 1px solid $border;
+    border-bottom: 1px solid $border;
+    padding: 7px 8px;
+    font-weight: 600;
+}
+
+QHeaderView::section:hover {
+    background-color: $surface;
+}
+
+QTableCornerButton::section {
+    background-color: $menu_bg;
+    border: none;
+}
+
+/* ---------- Pestañas ---------- */
+QTabWidget::pane {
+    border: 1px solid $border;
+    background: $app_bg;
+    border-radius: 4px;
+}
+
+QTabBar::tab {
+    background: $menu_bg;
+    color: $text_muted;
+    padding: 6px 12px;
+    border: 1px solid $border;
+    border-bottom: none;
+}
+
+QTabBar::tab:selected {
+    color: $text;
+    background: $app_bg;
+    border-top: 2px solid $accent;
+}
+
+QTabBar::tab:hover {
+    color: $text;
+}
+
+/* ---------- Checks y radios ---------- */
+QCheckBox, QRadioButton {
+    color: $text;
+    spacing: 6px;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid $border;
+    background: $input_bg;
+}
+
+QCheckBox::indicator {
+    border-radius: 3px;
+}
+
+QRadioButton::indicator {
+    border-radius: 7px;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background-color: $accent;
+    border-color: $accent;
+}
+
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {
+    background-color: $menu_bg;
+    border-color: $border;
+}
+
+/* ---------- Barras de desplazamiento ---------- */
+QScrollBar:vertical {
+    background: $menu_bg;
+    width: 10px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background: $surface;
+    min-height: 26px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: $accent;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    height: 0;
+    background: none;
+    border: none;
+}
+
+QScrollBar:horizontal {
+    background: $menu_bg;
+    height: 10px;
+    margin: 0;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: $surface;
+    min-width: 26px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: $accent;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    width: 0;
+    background: none;
+    border: none;
+}
+
+/* ---------- Menús, grupos y progreso ---------- */
+QMenu {
+    background-color: $menu_bg;
+    color: $text;
+    border: 1px solid $border;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 6px 18px;
+    border-radius: 4px;
+}
+
+QMenu::item:selected {
+    background-color: $surface;
+    color: $accent;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: $border;
+    margin: 4px 8px;
+}
+
+QGroupBox {
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px;
+    color: $text_muted;
+}
+
+QProgressBar {
+    background-color: $input_bg;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 4px;
+    text-align: center;
+}
+
+QProgressBar::chunk {
+    background-color: $accent;
+    border-radius: 3px;
+}
+
+QLabel {
+    color: $text;
+    background: transparent;
+}
+
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
+
+
+/* ---------- Controles de las vistas ---------- */
+#searchFrame {
+    background-color: $menu_bg;
+    border: 1px solid $border;
+    border-radius: 8px;
+}
+
+#searchCombo {
+    border: none;
+    background: transparent;
+    padding: 6px 10px;
+    min-width: 130px;
+    color: $text;
+}
+
+#searchInput {
+    border: none;
+    background: transparent;
+    padding: 6px 12px;
+    color: $text;
+}
+
+#secondaryBtn {
+    background-color: transparent;
+    color: $text_muted;
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: 600;
+}
+
+#secondaryBtn:hover {
+    background-color: $surface;
+    color: $text;
+}
+
+#pageBtn {
+    background-color: $menu_bg;
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+#pageBtn:hover {
+    background-color: $surface;
+}
+
+#pageBtn:disabled {
+    background-color: $menu_bg;
+    border-color: $border;
+}
+
+#paginationFrame {
+    border-top: 1px solid $border;
+    background: transparent;
+}
+
+#vDivider {
+    background-color: $border;
+    color: $border;
+    max-width: 1px;
+}
+
+#segmentButton {
+    border-radius: 0px;
+    border-right: none;
+}
+
+#segmentButton:last-child {
+    border-right: 1px solid $border;
+}
+
+
+#uploadZone {
+    border: 2px dashed $accent;
+    border-radius: 12px;
+    background-color: $menu_bg;
+}
+
+#uploadZone:hover {
+    background-color: $surface;
+}
+
+#uploadZone[dragging="true"] {
+    border: 2px solid $accent;
+    background-color: $surface;
+}
+
+#uploadIcon {
+    font-size: 40px;
+    color: $accent;
+    font-weight: bold;
+}
+
+#browseBtn {
+    background-color: $accent;
+    color: $menu_bg;
+    border: none;
+    padding: 10px 30px;
+    border-radius: 18px;
+    font-size: 10pt;
+    font-weight: bold;
+}
+
+#browseBtn:hover {
+    background-color: $accent_pink;
+}
+
+#hintLabel {
+    color: $text_muted;
+    font-size: 8pt;
+}
+
+#iconBadge {
+    background-color: $surface;
+    border-radius: 4px;
+}
+
+#fileName {
+    color: $text;
+    font-size: 10pt;
+    font-weight: 600;
+}
+
+#percentLabel {
+    color: $accent;
+    font-size: 9pt;
+    font-weight: 600;
+}
+
+#percentLabel[state="error"] {
+    color: $danger;
+}
+
+#dangerBtn {
+    background: transparent;
+    border: none;
+    color: $danger;
+    font-size: 12pt;
+}
+
+#dangerBtn:hover {
+    background-color: $surface;
+    border-radius: 12px;
+}
+
+#recentItem {
+    background: transparent;
+    border-bottom: 1px solid $border;
+    padding: 6px 0px;
+    color: $text;
+}
+
+#recentItem:hover {
+    background-color: $menu_bg;
+}
+
+#recentName {
+    color: $text;
+    font-size: 9pt;
+    font-weight: 600;
+}
+
+#fileItem {
+    background: transparent;
+    border-bottom: 1px solid $border;
+    padding: 8px 0px;
+    color: $text;
+}
+
+/* ---------- Resize grip ---------- */
+#frame_size_grip {
+    background: transparent;
+}

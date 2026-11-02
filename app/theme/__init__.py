@@ -1,0 +1,125 @@
+"""
+Carga y aplicación del tema.
+
+`base.qss` es una plantilla con tokens (`$text`, `$accent`…) que se sustituyen
+con la paleta elegida. Cambiar de tema es volver a aplicar el stylesheet: no
+hay colores hardcodeados en los widgets del shell.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from string import Template
+
+from PySide6.QtGui import QFont, QFontDatabase, QPalette, QColor
+from PySide6.QtWidgets import QApplication
+
+from app.theme.palette import PALETTES, ThemePalette, get_palette
+
+_QSS_PATH = Path(__file__).resolve().parent / 'base.qss'
+_current_theme = 'dark'
+
+
+def current_theme() -> str:
+    """Nombre del tema activo."""
+    return _current_theme
+
+
+def available_themes() -> list[str]:
+    return list(PALETTES)
+
+
+def _read_template() -> Template:
+    return Template(_QSS_PATH.read_text(encoding='utf-8'))
+
+
+def render_stylesheet(theme: str = 'dark') -> str:
+    """Resolver la plantilla QSS con los colores del tema."""
+    palette = get_palette(theme)
+    tokens = {
+        key: value for key, value in vars(palette).items() if isinstance(value, str)
+    }
+    return _read_template().substitute(tokens)
+
+
+def build_palette(theme: str = 'dark') -> QPalette:
+    """QPalette coherente con el QSS (para widgets nativos y menús)."""
+    tokens: ThemePalette = get_palette(theme)
+    palette = QPalette()
+    roles = QPalette.ColorRole
+    groups = QPalette.ColorGroup
+
+    palette.setColor(roles.Window, QColor(tokens.app_bg))
+    palette.setColor(roles.WindowText, QColor(tokens.text))
+    palette.setColor(roles.Base, QColor(tokens.input_bg))
+    palette.setColor(roles.AlternateBase, QColor(tokens.menu_bg))
+    palette.setColor(roles.Text, QColor(tokens.text))
+    palette.setColor(roles.Button, QColor(tokens.surface))
+    palette.setColor(roles.ButtonText, QColor(tokens.text))
+    palette.setColor(roles.ToolTipBase, QColor(tokens.menu_bg))
+    palette.setColor(roles.ToolTipText, QColor(tokens.text))
+    palette.setColor(roles.Highlight, QColor(tokens.accent))
+    palette.setColor(roles.HighlightedText, QColor(tokens.menu_bg))
+    palette.setColor(roles.PlaceholderText, QColor(tokens.text_muted))
+    palette.setColor(roles.BrightText, QColor(tokens.danger))
+
+    palette.setColor(groups.Disabled, roles.Text, QColor(tokens.text_muted))
+    palette.setColor(groups.Disabled, roles.WindowText, QColor(tokens.text_muted))
+    palette.setColor(groups.Disabled, roles.ButtonText, QColor(tokens.text_muted))
+
+    return palette
+
+
+def _resolve_font() -> QFont:
+    """Usar Segoe UI si existe; si no, la fuente por defecto del sistema."""
+    families = set(QFontDatabase.families())
+    for candidate in ('Segoe UI', 'Noto Sans', 'DejaVu Sans'):
+        if candidate in families:
+            font = QFont(candidate, 10)
+            font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+            return font
+    return QFont()
+
+
+def apply_theme(app: QApplication, theme: str = 'dark') -> None:
+    """Aplicar estilo Fusion, paleta y QSS del tema indicado."""
+    global _current_theme
+    _current_theme = theme if theme in PALETTES else 'dark'
+
+    app.setStyle('Fusion')
+    app.setPalette(build_palette(_current_theme))
+    app.setFont(_resolve_font())
+    app.setStyleSheet(render_stylesheet(_current_theme))
+
+
+def toggle_theme(app: QApplication) -> str:
+    """Alternar entre oscuro y claro y devolver el tema resultante."""
+    next_theme = 'light' if _current_theme == 'dark' else 'dark'
+    apply_theme(app, next_theme)
+    return next_theme
+
+
+# --- Compatibilidad con la API anterior (tema claro explícito) ---
+def apply_light_theme(app: QApplication) -> None:
+    apply_theme(app, 'light')
+
+
+def build_light_palette() -> QPalette:
+    return build_palette('light')
+
+
+def base_stylesheet(theme: str = 'dark') -> str:
+    return render_stylesheet(theme)
+
+
+__all__ = [
+    'apply_light_theme',
+    'apply_theme',
+    'available_themes',
+    'base_stylesheet',
+    'build_light_palette',
+    'build_palette',
+    'current_theme',
+    'render_stylesheet',
+    'toggle_theme',
+]

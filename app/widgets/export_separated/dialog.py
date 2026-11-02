@@ -80,7 +80,7 @@ class ExportSeparatedDialog(QDialog):
         cfg_grid.addWidget(QLabel("Plantilla:"), 1, 0)
         tpl_row = QHBoxLayout()
         self.template_path_label = QLabel("Ninguna")
-        self.template_path_label.setStyleSheet("color: #6b7280; font-style: italic;")
+        self.template_path_label.setStyleSheet("color: #717e95; font-style: italic;")
         tpl_row.addWidget(self.template_path_label, 1)
         self.select_template_btn = QPushButton("Examinar…")
         self.select_template_btn.setFixedWidth(90)
@@ -111,7 +111,7 @@ class ExportSeparatedDialog(QDialog):
         out_grid.addWidget(QLabel("Destino:"), 0, 0)
         dest_row = QHBoxLayout()
         self.dest_folder_label = QLabel("Sin seleccionar")
-        self.dest_folder_label.setStyleSheet("color: #6b7280; font-style: italic;")
+        self.dest_folder_label.setStyleSheet("color: #717e95; font-style: italic;")
         dest_row.addWidget(self.dest_folder_label, 1)
         self.select_folder_btn = QPushButton("Cambiar…")
         self.select_folder_btn.setFixedWidth(90)
@@ -192,10 +192,10 @@ class ExportSeparatedDialog(QDialog):
         self.export_btn = QPushButton("Exportar")
         self.export_btn.setEnabled(False)
         self.export_btn.setStyleSheet(
-            "QPushButton { background-color: #3b82f6; color: white; "
+            "QPushButton { background-color: #bd93f9; color: white; "
             "border: none; border-radius: 6px; padding: 6px 18px; font-weight: 600; }"
-            "QPushButton:hover { background-color: #2563eb; }"
-            "QPushButton:disabled { background-color: #94a3b8; }"
+            "QPushButton:hover { background-color: #ff79c6; }"
+            "QPushButton:disabled { background-color: #717e95; }"
         )
         bottom.addWidget(self.export_btn)
 

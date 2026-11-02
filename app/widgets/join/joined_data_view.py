@@ -52,40 +52,12 @@ class JoinedDataView(DataView):
 
     def create_join_metadata_section(self) -> QGroupBox:
         metadata_group = QGroupBox("\U0001f4ca Metadatos del Cruce")
-        metadata_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #27ae60;
-                border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
-                padding-bottom: 8px;
-                background-color: #f8fff9;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: #27ae60;
-            }
-        """)
 
         layout = QVBoxLayout(metadata_group)
 
         self.metadata_text = QTextEdit()
         self.metadata_text.setMaximumHeight(100)
         self.metadata_text.setReadOnly(True)
-        self.metadata_text.setStyleSheet("""
-            QTextEdit {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 3px;
-                padding: 5px;
-                font-family: monospace;
-                font-size: 10px;
-                color: #1e293b;
-            }
-        """)
         layout.addWidget(self.metadata_text)
 
         buttons_layout = QHBoxLayout()

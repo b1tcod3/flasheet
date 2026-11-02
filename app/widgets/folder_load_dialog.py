@@ -45,7 +45,7 @@ class FolderLoadDialog(QDialog):
         folder_layout = QHBoxLayout(folder_group)
 
         self.folder_path_label = QLabel("Ninguna carpeta seleccionada")
-        self.folder_path_label.setStyleSheet("border: 1px solid #ccc; color: #334155; padding: 5px;")
+        self.folder_path_label.setStyleSheet("border: 1px solid #2c313a; color: #334155; padding: 5px;")
 
         self.select_folder_btn = QPushButton("Seleccionar Carpeta...")
         self.select_folder_btn.clicked.connect(self.select_folder)

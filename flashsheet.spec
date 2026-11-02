@@ -49,6 +49,7 @@ hiddenimports += collect_submodules('pyarrow')
 
 datas = [
     (str(ASSETS_DIR), 'assets'),
+    (str(PROJECT_ROOT / 'app' / 'theme' / 'base.qss'), 'app/theme'),
 ]
 datas += collect_data_files('reportlab')
 

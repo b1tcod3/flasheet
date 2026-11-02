@@ -69,7 +69,6 @@ class DataView(QWidget):
         self.setup_ui()
 
     def setup_ui(self) -> None:
-        self.setStyleSheet("background-color: #f8fafc;")
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(12)
         main_layout.setContentsMargins(20, 16, 20, 16)
@@ -87,76 +86,39 @@ class DataView(QWidget):
 
     def _create_search_section(self, parent_layout: QVBoxLayout) -> None:
         search_frame = QFrame()
-        search_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-            }
-        """)
+        search_frame.setObjectName("searchFrame")
         search_layout = QHBoxLayout(search_frame)
         search_layout.setContentsMargins(4, 4, 4, 4)
         search_layout.setSpacing(0)
 
         self.search_column_combo = QComboBox()
-        self.search_column_combo.setStyleSheet("""
-            QComboBox {
-                border: none;
-                background-color: transparent;
-                padding: 6px 10px;
-                min-width: 130px;
-                color: #334155;
-            }
-        """)
+        self.search_column_combo.setObjectName("searchCombo")
         search_layout.addWidget(self.search_column_combo)
 
         sep1 = QFrame()
         sep1.setFrameShape(QFrame.Shape.VLine)
-        sep1.setStyleSheet("color: #e2e8f0;")
+        sep1.setObjectName("vDivider")
         search_layout.addWidget(sep1)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar...")
         self.search_input.setMinimumWidth(220)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                border: none;
-                background-color: transparent;
-                padding: 6px 12px;
-                color: #334155;
-            }
-        """)
+        self.search_input.setObjectName("searchInput")
         self.search_input.returnPressed.connect(self._apply_text_filter)
         search_layout.addWidget(self.search_input, 1)
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.VLine)
-        sep2.setStyleSheet("color: #e2e8f0;")
+        sep2.setObjectName("vDivider")
         search_layout.addWidget(sep2)
 
         self.filter_btn = QPushButton("Filtrar")
-        self.filter_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6; color: white; border: none;
-                border-radius: 6px; padding: 6px 12px; font-weight: 600;
-                margin: 2px;
-            }
-            QPushButton:hover { background-color: #2563eb; }
-            QPushButton:pressed { background-color: #1d4ed8; }
-        """)
+        self.filter_btn.setObjectName("primaryBtn")
         self.filter_btn.clicked.connect(self._apply_text_filter)
         search_layout.addWidget(self.filter_btn)
 
         self.clear_search_btn = QPushButton("Limpiar")
-        self.clear_search_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent; color: #64748b;
-                border: 1px solid #e2e8f0; border-radius: 6px;
-                padding: 6px 12px; font-weight: 600; margin: 2px;
-            }
-            QPushButton:hover { background-color: #f1f5f9; border-color: #cbd5e1; }
-            QPushButton:pressed { background-color: #e2e8f0; }
-        """)
+        self.clear_search_btn.setObjectName("secondaryBtn")
         self.clear_search_btn.clicked.connect(self.clear_filter)
         search_layout.addWidget(self.clear_search_btn)
 
@@ -174,67 +136,22 @@ class DataView(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
 
-        self.table_view.setStyleSheet("""
-            QTableView {
-                background-color: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                outline: none;
-                gridline-color: transparent;
-            }
-            QTableView::item {
-                padding: 8px 10px;
-                border-bottom: 1px solid #f1f5f9;
-                color: #334155;
-            }
-            QTableView::item:alternate {
-                background-color: #f8fafc;
-            }
-            QTableView::item:selected {
-                background-color: #dbeafe;
-                color: #1e40af;
-            }
-            QTableView::item:hover {
-                background-color: #f1f5f9;
-            }
-            QHeaderView::section {
-                background-color: #f1f5f9;
-                color: #0f172a;
-                font-weight: 600;
-                padding: 10px 10px;
-                border: none;
-                border-bottom: 2px solid #cbd5e1;
-                border-right: 1px solid #e2e8f0;
-                text-align: left;
-            }
-            QHeaderView::section:last {
-                border-right: none;
-            }
-        """)
 
         parent_layout.addWidget(self.table_view, 1)
 
     def _create_pagination_section(self, parent_layout: QVBoxLayout) -> None:
         pagination_frame = QFrame()
-        pagination_frame.setStyleSheet("""
-            QFrame {
-                border-top: 1px solid #e5e7eb;
-                background-color: transparent;
-                padding-top: 10px;
-            }
-            QLabel { color: #6b7280; font-size: 13px; }
-            QSpinBox {
-                border: 1px solid #d1d5db; border-radius: 4px; padding: 2px;
-            }
-        """)
+        pagination_frame.setObjectName("paginationFrame")
 
         pagination_layout = QHBoxLayout(pagination_frame)
         pagination_layout.setContentsMargins(0, 0, 0, 0)
 
         self.page_info_label = QLabel("0 registros")
+        self.page_info_label.setObjectName("mutedLabel")
         pagination_layout.addWidget(self.page_info_label)
 
         self.page_number_label = QLabel("Página 1 de 1")
+        self.page_number_label.setObjectName("mutedLabel")
         pagination_layout.addWidget(self.page_number_label)
 
         pagination_layout.addStretch()
@@ -257,19 +174,9 @@ class DataView(QWidget):
         self.last_page_btn = QPushButton()
         self.last_page_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSkipForward))
 
-        pagination_btn_style = """
-            QPushButton {
-                background-color: white; border: 1px solid #d1d5db;
-                border-radius: 6px; padding: 4px 8px;
-            }
-            QPushButton:hover { background-color: #f3f4f6; }
-            QPushButton:disabled {
-                background-color: #f9fafb; border-color: #e5e7eb;
-            }
-        """
         for btn in (self.first_page_btn, self.prev_page_btn,
                     self.next_page_btn, self.last_page_btn):
-            btn.setStyleSheet(pagination_btn_style)
+            btn.setObjectName("pageBtn")
             btn.setFixedSize(32, 28)
             pagination_layout.addWidget(btn)
 
@@ -319,22 +226,13 @@ class DataView(QWidget):
 
     def _create_quick_filter_row(self, col: str, df: pd.DataFrame) -> QWidget:
         frame = QFrame()
-        frame.setStyleSheet("""
-            QFrame {
-                border: 1px solid #e2e8f0;
-                border-radius: 6px;
-                background-color: white;
-            }
-        """)
+        frame.setObjectName("card")
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(0)
 
         label = QLabel(col)
-        label.setStyleSheet("""
-            color: #4b5563; font-weight: bold; font-size: 12px;
-            border: none; padding-right: 8px;
-        """)
+        label.setObjectName("mutedLabel")
         layout.addWidget(label)
 
         btn_group = QButtonGroup(frame)
@@ -346,7 +244,7 @@ class DataView(QWidget):
         all_btn = QPushButton("Todos")
         all_btn.setCheckable(True)
         all_btn.setChecked(True)
-        all_btn.setStyleSheet(self._segment_btn_style(first=True))
+        all_btn.setObjectName("segmentButton")
         btn_group.addButton(all_btn, 0)
         all_btn.clicked.connect(lambda: self._apply_quick_filter_clear(col))
         layout.addWidget(all_btn)
@@ -354,7 +252,7 @@ class DataView(QWidget):
         for i, val in enumerate(values):
             btn = QPushButton(str(val))
             btn.setCheckable(True)
-            btn.setStyleSheet(self._segment_btn_style(first=False))
+            btn.setObjectName("segmentButton")
             btn_group.addButton(btn, i + 1)
             btn.clicked.connect(lambda checked, c=col, v=str(val): self._apply_quick_filter(c, v))
             layout.addWidget(btn)
@@ -362,31 +260,6 @@ class DataView(QWidget):
         layout.addStretch()
         return frame
 
-    @staticmethod
-    def _segment_btn_style(first: bool = False) -> str:
-        border_left = "border-left: none;" if not first else ""
-        radius_left = "border-top-left-radius: 6px; border-bottom-left-radius: 6px;" if first else ""
-        radius_right = "border-top-right-radius: 6px; border-bottom-right-radius: 6px;" if not first else ""
-        return f"""
-            QPushButton {{
-                background-color: white;
-                border: 1px solid #d1d5db;
-                {border_left}
-                {radius_left}
-                {radius_right}
-                padding: 5px 14px;
-                color: #4b5563;
-                font-weight: 500;
-                font-size: 12px;
-                margin: 0px;
-            }}
-            QPushButton:checked {{
-                background-color: #eff6ff;
-                color: #1d4ed8;
-                border-color: #93b4f5;
-            }}
-            QPushButton:hover:!checked {{ background-color: #f3f4f6; }}
-        """
 
     def _apply_quick_filter(self, column: str, value: str) -> None:
         if self.pagination_manager is None:
@@ -582,6 +455,13 @@ class DataView(QWidget):
     def last_page(self) -> None:
         if self.pagination_manager:
             self.pagination_manager.last_page()
+
+    def set_page_size(self, size: int) -> None:
+        """Cambiar las filas por página (sincroniza el control y el gestor)."""
+        if size != self.page_size_spin.value():
+            self.page_size_spin.setValue(size)
+        elif self.pagination_manager is not None:
+            self.pagination_manager.set_page_size(size)
 
     def _change_page_size(self, size: int) -> None:
         if self.pagination_manager:

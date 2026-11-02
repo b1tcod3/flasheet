@@ -84,13 +84,14 @@ class TestExportSeparatedIntegration(unittest.TestCase):
         window.data_service.set_original_data(self.df_test.copy())
         
         # Habilitar acciones de datos via single source of truth
-        window.menu_builder.set_data_actions_enabled(True)
+        window.on_datos_disponibles(True)
         
-        self.assertTrue(window.menu_builder.exportar_separado_action.isEnabled())
+        separate_btn = window.side_bar.action_button('separate')
+        self.assertIsNotNone(separate_btn)
+        self.assertTrue(separate_btn.isEnabled())
         
-        # Verificar que tiene el status tip correcto
-        expected_tip = "Exportar datos separados por columna usando plantillas Excel"
-        self.assertEqual(window.menu_builder.exportar_separado_action.statusTip(), expected_tip)
+        # Verificar que tiene el tooltip correcto
+        self.assertEqual(separate_btn.text(), 'Datos separados')
     
     def test_export_processing_integration(self) -> None:
         """Test procesamiento de exportación desde core"""
@@ -117,13 +118,13 @@ class TestExportSeparatedIntegration(unittest.TestCase):
         window = MainWindow()
         
         # Sin datos
-        window.menu_builder.set_data_actions_enabled(False)
-        self.assertFalse(window.menu_builder.exportar_separado_action.isEnabled())
+        window.on_datos_disponibles(False)
+        self.assertFalse(window.side_bar.action_button('separate').isEnabled())
         
         # Con datos válidos
         window.data_service.set_original_data(self.df_test.copy())
-        window.menu_builder.set_data_actions_enabled(True)
-        self.assertTrue(window.menu_builder.exportar_separado_action.isEnabled())
+        window.on_datos_disponibles(True)
+        self.assertTrue(window.side_bar.action_button('separate').isEnabled())
     
     def test_error_handling_integration(self) -> None:
         """Test manejo de errores en la integración"""
@@ -162,12 +163,12 @@ class TestExportSeparatedIntegration(unittest.TestCase):
         self.assertIn('success', result)
     
     def test_menu_action_connection(self) -> None:
-        """Test que el menú está conectado correctamente"""
+        """Test que el sidebar está conectado correctamente"""
         window = MainWindow()
         
-        # Verificar que la acción del menú existe
-        action = window.menu_builder.exportar_separado_action
-        self.assertIsNotNone(action)
+        # Verificar que la acción del sidebar existe
+        separate_btn = window.side_bar.action_button('separate')
+        self.assertIsNotNone(separate_btn)
         
         # Verificar que el método exportar_datos_separados existe en el coordinator
         self.assertTrue(hasattr(window.coordinator, 'exportar_datos_separados'))

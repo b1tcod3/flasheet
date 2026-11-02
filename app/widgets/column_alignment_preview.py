@@ -36,7 +36,7 @@ class ColumnAlignmentPreview(QWidget):
         header_layout = QHBoxLayout()
 
         self.title_label = QLabel("Vista Previa de Alineación de Columnas")
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #1e293b;")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #dddddd;")
         header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
@@ -69,7 +69,7 @@ class ColumnAlignmentPreview(QWidget):
 
         # Status label
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #666; font-size: 12px;")
+        self.status_label.setStyleSheet("color: #717e95; font-size: 12px;")
         layout.addWidget(self.status_label)
 
     def connect_signals(self) -> None:

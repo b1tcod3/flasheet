@@ -4,6 +4,9 @@ Visor de datos tabulares con soporte para archivos Excel y CSV, construido con P
 
 ## Características
 
+- Shell propio sin marco, con sidebar animado y paneles laterales (estilo PyDracula)
+- Tema oscuro Dracula por defecto y tema claro conmutable
+
 - Visualización de datos en tabla interactiva
 - Filtrado avanzado con soporte regex
 - Exportación a PDF, Excel, CSV, SQL e imágenes
@@ -62,9 +65,9 @@ flash-sheet/
 ├── requirements.txt           # Dependencias
 ├── app/                       # Aplicación principal
 │   ├── app_coordinator.py    # Orquestador
-│   ├── menus/                 # Menús
+│   ├── shell/                # Ventana sin marco: title bar, sidebar y paneles
+│   ├── theme/                # Paleta Dracula + plantilla QSS (oscuro/claro)
 │   ├── services/             # Servicios (datos, exportación, filtros, pivote)
-│   ├── toolbar/              # Barra de herramientas
 │   ├── view_manager/         # Gestor de vistas
 │   └── widgets/              # Widgets UI
 ├── core/                     # Lógica de negocio

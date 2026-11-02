@@ -29,7 +29,7 @@ class InfoModal(QDialog):
         close_button.clicked.connect(self.accept)
         close_button.setStyleSheet("""
             QPushButton {
-                background-color: #4a90e2;
+                background-color: #bd93f9;
                 color: white;
                 border: none;
                 padding: 8px 16px;

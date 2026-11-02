@@ -17,11 +17,11 @@ class CSVSeparatorDialog(QDialog):
         self.resize(300, 120)
 
         self.setStyleSheet("""
-            QDialog { background-color: white; }
+            QDialog { background-color: #343b48; }
             QLabel { color: #374151; font-size: 13px; }
             QComboBox {
-                border: 1px solid #d1d5db; border-radius: 6px;
-                padding: 6px 10px; background-color: #f9fafb; color: #374151;
+                border: 1px solid #2c313a; border-radius: 6px;
+                padding: 6px 10px; background-color: #21252b; color: #374151;
                 min-width: 150px;
             }
             QPushButton {
@@ -56,7 +56,7 @@ class CSVSeparatorDialog(QDialog):
         cancel_btn = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)
         cancel_btn.setText("Cancelar")
         cancel_btn.setStyleSheet(
-            "background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;"
+            "background-color: #21252b; color: #717e95; border: 1px solid #2c313a;"
         )
 
         self.button_box.accepted.connect(self.accept)

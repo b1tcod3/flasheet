@@ -25,23 +25,14 @@ class FileItemWidget(QFrame):
         self.setup_ui()
 
     def setup_ui(self) -> None:
-        self.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border-bottom: 1px solid #e0e0e0;
-                padding: 8px 0px;
-                color: #334155;
-            }
-            QLabel { border: none; color: #334155; }
-        """)
-        
+        self.setObjectName("fileItem")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
 
         # Icono del archivo
         self.icon_label = QLabel()
         self.icon_label.setFixedSize(32, 32)
-        self.icon_label.setStyleSheet("background-color: #f0f4f8; border-radius: 4px;")
+        self.icon_label.setObjectName("iconBadge")
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon).pixmap(20, 20))
         layout.addWidget(self.icon_label)
@@ -51,32 +42,21 @@ class FileItemWidget(QFrame):
         center_layout.setSpacing(2)
         
         self.name_label = QLabel(self.filename)
-        self.name_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #333;")
+        self.name_label.setObjectName("fileName")
         center_layout.addWidget(self.name_label)
 
         # Elementos de progreso
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(4)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                background-color: #e0e0e0;
-                border-radius: 2px;
-            }
-            QProgressBar::chunk {
-                background-color: #4a90e2;
-                border-radius: 2px;
-            }
-        """)
         center_layout.addWidget(self.progress_bar)
 
         # Textos de progreso (Tamaño y Porcentaje)
         self.progress_text_layout = QHBoxLayout()
         self.size_label = QLabel("Calculando...")
-        self.size_label.setStyleSheet("font-size: 11px; color: #888;")
+        self.size_label.setObjectName("mutedLabel")
         self.percent_label = QLabel("Cargando... 0%")
-        self.percent_label.setStyleSheet("font-size: 11px; color: #4a90e2; font-weight: bold;")
+        self.percent_label.setObjectName("percentLabel")
         
         self.progress_text_layout.addWidget(self.size_label)
         self.progress_text_layout.addStretch()
@@ -90,15 +70,7 @@ class FileItemWidget(QFrame):
         self.action_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         self.action_btn.setFixedSize(24, 24)
         self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.action_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                color: #ff4d4f;
-                font-size: 14px;
-                background-color: transparent;
-            }
-            QPushButton:hover { background-color: #ffeeee; border-radius: 12px; }
-        """)
+        self.action_btn.setObjectName("dangerBtn")
         self.action_btn.clicked.connect(self._on_action_clicked)
         layout.addWidget(self.action_btn)
 
@@ -130,7 +102,7 @@ class FileItemWidget(QFrame):
         self.progress_bar.hide()
         self.size_label.hide()
         self.percent_label.setText(message)
-        self.percent_label.setStyleSheet("font-size: 11px; color: #ff4d4f; font-weight: bold;")
+        self.percent_label.setProperty("state", "error")
         self.action_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
 
     def _on_action_clicked(self) -> None:
@@ -150,16 +122,7 @@ class RecentFileWidget(QFrame):
                  parent: QWidget | None = None):
         super().__init__(parent)
         self.filepath = filepath
-        self.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border-bottom: 1px solid #e0e0e0;
-                padding: 6px 0px;
-                color: #334155;
-            }
-            QFrame:hover { background-color: #f5f7fa; }
-            QLabel { border: none; color: #334155; }
-        """)
+        self.setObjectName("recentItem")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
@@ -168,7 +131,7 @@ class RecentFileWidget(QFrame):
 
         icon_label = QLabel()
         icon_label.setFixedSize(28, 28)
-        icon_label.setStyleSheet("background-color: #eef5ff; border-radius: 4px;")
+        icon_label.setObjectName("iconBadge")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon).pixmap(18, 18))
         layout.addWidget(icon_label)
@@ -177,11 +140,11 @@ class RecentFileWidget(QFrame):
         text_layout.setSpacing(1)
 
         name_lbl = QLabel(filename)
-        name_lbl.setStyleSheet("font-weight: bold; font-size: 12px; color: #333;")
+        name_lbl.setObjectName("recentName")
         text_layout.addWidget(name_lbl)
 
         time_lbl = QLabel(relative_time)
-        time_lbl.setStyleSheet("font-size: 11px; color: #888;")
+        time_lbl.setObjectName("mutedLabel")
         text_layout.addWidget(time_lbl)
 
         layout.addLayout(text_layout, 1)
@@ -189,10 +152,7 @@ class RecentFileWidget(QFrame):
         remove_btn = QPushButton()
         remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         remove_btn.setFixedSize(20, 20)
-        remove_btn.setStyleSheet("""
-            QPushButton { border: none; background: transparent; }
-            QPushButton:hover { background-color: #ffeeee; border-radius: 10px; }
-        """)
+        remove_btn.setObjectName("dangerBtn")
         remove_btn.clicked.connect(lambda: self.remove_clicked.emit(filepath))
         layout.addWidget(remove_btn)
 
@@ -233,16 +193,6 @@ class MainView(QWidget):
         
         self.drop_zone = QFrame()
         self.drop_zone.setObjectName("uploadZone")
-        self.drop_zone.setStyleSheet("""
-            QFrame#uploadZone {
-                border: 2px dashed #4a90e2;
-                border-radius: 12px;
-                background-color: #f8fbff;
-            }
-            QFrame#uploadZone:hover {
-                background-color: #eef5ff;
-            }
-        """)
         
         drop_layout = QVBoxLayout(self.drop_zone)
         drop_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -257,42 +207,31 @@ class MainView(QWidget):
             logo_label.setPixmap(scaled_pixmap)
         else:
             logo_label.setText("Flash Sheet")
-            logo_label.setStyleSheet("font-size: 24px; color: #4a90e2; font-weight: bold;")
+            logo_label.setObjectName("sectionTitle")
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(logo_label)
 
         # Flecha de subida
         upload_icon = QLabel("↑")
-        upload_icon.setStyleSheet("font-size: 48px; color: #4a90e2; font-weight: bold;")
+        upload_icon.setObjectName("uploadIcon")
         upload_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(upload_icon)
 
         # Botón Browse
-        self.load_button = QPushButton("Browse")
+        self.load_button = QPushButton("Examinar")
+        self.load_button.setObjectName("browseBtn")
         self.load_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.load_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                padding: 10px 30px;
-                border-radius: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #357abd; }
-        """)
         self.load_button.clicked.connect(self.load_file)
         drop_layout.addWidget(self.load_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Texto informativo
-        drop_label = QLabel("drop a file here")
-        drop_label.setStyleSheet("color: #a0a0a0; font-size: 14px;")
+        drop_label = QLabel("Arrastra un archivo aquí")
+        drop_label.setObjectName("mutedLabel")
         drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(drop_label)
 
         support_label = QLabel("*File supported .csv, .xlsx, .json")
-        support_label.setStyleSheet("color: #666; font-size: 12px;")
+        support_label.setObjectName("hintLabel")
         support_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(support_label)
 
@@ -305,17 +244,15 @@ class MainView(QWidget):
         right_panel = QVBoxLayout()
         
         title_label = QLabel("Uploaded files")
-        title_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #333;")
+        title_label.setObjectName("sectionTitle")
         right_panel.addWidget(title_label)
 
         # Scroll Area para la lista
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll_area.setStyleSheet("background: transparent;")
         
         self.files_container = QWidget()
-        self.files_container.setStyleSheet("background: transparent;")
         self.files_layout = QVBoxLayout(self.files_container)
         self.files_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.files_layout.setContentsMargins(0, 0, 10, 0)
@@ -324,7 +261,7 @@ class MainView(QWidget):
         right_panel.addWidget(self.scroll_area)
 
         self.recent_title_label = QLabel("Archivos Recientes")
-        self.recent_title_label.setStyleSheet("font-weight: bold; font-size: 16px; color: #333; padding-top: 8px;")
+        self.recent_title_label.setObjectName("sectionTitle")
         self.recent_title_label.hide()
         right_panel.addWidget(self.recent_title_label)
 
@@ -332,11 +269,9 @@ class MainView(QWidget):
         self.recent_scroll_area.setWidgetResizable(True)
         self.recent_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self.recent_scroll_area.setMaximumHeight(200)
-        self.recent_scroll_area.setStyleSheet("background: transparent;")
         self.recent_scroll_area.hide()
 
         self.recent_container = QWidget()
-        self.recent_container.setStyleSheet("background: transparent;")
         self.recent_layout = QVBoxLayout(self.recent_container)
         self.recent_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.recent_layout.setContentsMargins(0, 0, 10, 0)
@@ -346,13 +281,7 @@ class MainView(QWidget):
         
         # Botón de opciones (ahora reubicado o flotante bajo la lista)
         self.options_button = QPushButton("Opciones del Archivo Actual")
-        self.options_button.setStyleSheet("""
-            QPushButton {
-                background-color: #6c757d; color: white; border: none;
-                padding: 8px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #5a6268; }
-        """)
+        self.options_button.setObjectName("secondaryBtn")
         self.options_button.clicked.connect(self.show_options)
         self.options_button.hide()
         right_panel.addWidget(self.options_button)
@@ -363,18 +292,16 @@ class MainView(QWidget):
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
-            self.drop_zone.setStyleSheet("""
-                QFrame#uploadZone {
-                    border: 2px solid #4a90e2; background-color: #eef5ff; border-radius: 12px;
-                }
-            """)
+            self._set_drag_state(True)
 
     def dragLeaveEvent(self, event: QDragLeaveEvent | None = None) -> None:
-        self.drop_zone.setStyleSheet("""
-            QFrame#uploadZone {
-                border: 2px dashed #4a90e2; background-color: #f8fbff; border-radius: 12px;
-            }
-        """)
+        self._set_drag_state(False)
+
+    def _set_drag_state(self, dragging: bool) -> None:
+        """Resaltar la zona de carga sin reescribir el stylesheet."""
+        self.drop_zone.setProperty('dragging', 'true' if dragging else 'false')
+        self.drop_zone.style().unpolish(self.drop_zone)
+        self.drop_zone.style().polish(self.drop_zone)
 
     def dropEvent(self, event: QDropEvent) -> None:
         self.dragLeaveEvent()

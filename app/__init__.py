@@ -4,12 +4,6 @@ Flash View Sheet - Paquete Principal de la Aplicación
 Este módulo export los componentes principales de la aplicación.
 """
 
-# Menús
-from app.menus import MenuBuilder
-
-# Toolbar
-from app.toolbar import ToolbarManager
-
 # Servicios
 from app.services import (
     DataService,
@@ -28,12 +22,6 @@ from app.widgets import (
 __version__ = "1.1.0"
 
 __all__ = [
-    # Menús
-    'MenuBuilder',
-    
-    # Toolbar
-    'ToolbarManager',
-    
     # Servicios
     'DataService',
     'ExportService',
