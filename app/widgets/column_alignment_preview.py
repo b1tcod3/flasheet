@@ -36,7 +36,7 @@ class ColumnAlignmentPreview(QWidget):
         header_layout = QHBoxLayout()
 
         self.title_label = QLabel("Vista Previa de Alineación de Columnas")
-        self.title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #1e293b;")
         header_layout.addWidget(self.title_label)
 
         header_layout.addStretch()
@@ -55,14 +55,14 @@ class ColumnAlignmentPreview(QWidget):
         # Alignment table
         self.alignment_table = QTableWidget()
         self.alignment_table.setAlternatingRowColors(True)
-        self.alignment_table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.alignment_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.alignment_table.setDragEnabled(True)
         self.alignment_table.setAcceptDrops(True)
         self.alignment_table.setDropIndicatorShown(True)
         self.alignment_table.viewport().setAcceptDrops(True)
 
         # Enable context menu
-        self.alignment_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.alignment_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.alignment_table.customContextMenuRequested.connect(self.show_context_menu)
 
         layout.addWidget(self.alignment_table)
@@ -122,13 +122,13 @@ class ColumnAlignmentPreview(QWidget):
         for pos in range(max_cols):
             # Position column
             pos_item = QTableWidgetItem(str(pos + 1))
-            pos_item.setFlags(pos_item.flags() & ~Qt.ItemIsEditable)
+            pos_item.setFlags(pos_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.alignment_table.setItem(pos, 0, pos_item)
 
             # Include checkbox
             include_checkbox = QCheckBox()
             include_checkbox.setChecked(pos in self.included_positions)
-            include_checkbox.stateChanged.connect(lambda state, p=pos: self.on_include_changed(p, state))
+            include_checkbox.checkStateChanged.connect(lambda state, p=pos: self.on_include_changed(p, state))
             self.alignment_table.setCellWidget(pos, 1, include_checkbox)
 
             # Column names from each file
@@ -204,9 +204,9 @@ class ColumnAlignmentPreview(QWidget):
         """Handle item changes"""
         # Could update mappings here
 
-    def on_include_changed(self, position: int, state: int) -> None:
+    def on_include_changed(self, position: int, state: Qt.CheckState) -> None:
         """Handle include checkbox state change"""
-        if state == 2:  # Checked
+        if state == Qt.CheckState.Checked:
             self.included_positions.add(position)
         else:  # Unchecked
             self.included_positions.discard(position)
@@ -283,18 +283,18 @@ class ColumnAlignmentPreview(QWidget):
         if hasattr(event, 'button') and hasattr(event, 'pos'):
             from PySide6.QtGui import QMouseEvent
             assert isinstance(event, QMouseEvent)
-            if event.button() == Qt.LeftButton:
-                item = self.alignment_table.itemAt(event.pos())
+            if event.button() == Qt.MouseButton.LeftButton:
+                item = self.alignment_table.itemAt(event.position().toPoint())
                 if item and item.column() > 1:  # Not position or include columns
                     self.dragged_item = item
-                    self.drag_start_pos = event.pos()
+                    self.drag_start_pos = event.position().toPoint()
 
     def mouseMoveEvent(self, event: object) -> None:
         """Handle mouse move for drag"""
         if self.dragged_item and self.drag_start_pos and hasattr(event, 'pos'):
             from PySide6.QtGui import QMouseEvent
             assert isinstance(event, QMouseEvent)
-            if (event.pos() - self.drag_start_pos).manhattanLength() > 10:
+            if (event.position().toPoint() - self.drag_start_pos).manhattanLength() > 10:
                 # Start drag
                 drag = QDrag(self)
                 mime_data = QMimeData()
@@ -305,11 +305,11 @@ class ColumnAlignmentPreview(QWidget):
                 pixmap = QPixmap(self.dragged_item.sizeHint())
                 pixmap.fill(QColor('lightblue'))
                 painter = QPainter(pixmap)
-                painter.drawText(pixmap.rect(), Qt.AlignCenter, self.dragged_item.text())
+                painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, self.dragged_item.text())
                 painter.end()
                 drag.setPixmap(pixmap)
 
-                drag.exec(Qt.MoveAction)
+                drag.exec(Qt.DropAction.MoveAction)
 
     def dropEvent(self, event: object) -> None:
         """Handle drop event"""
@@ -317,7 +317,7 @@ class ColumnAlignmentPreview(QWidget):
             from PySide6.QtGui import QDropEvent
             assert isinstance(event, QDropEvent)
             if event.mimeData().hasText():
-                target_item = self.alignment_table.itemAt(event.pos())
+                target_item = self.alignment_table.itemAt(event.position().toPoint())
                 if target_item and target_item != self.dragged_item and self.dragged_item is not None:
                     # Swap the text
                     temp_text = target_item.text()

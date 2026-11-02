@@ -3,9 +3,10 @@ Modelo personalizado para conectar DataFrames de Pandas con QTableView
 Implementa paginación virtual para optimizar el rendimiento con datasets grandes
 """
 
+import logging
+
 import pandas as pd
-from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
-import math
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt, Signal
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,24 +14,21 @@ from typing import Any
 # Añadir directorio raíz para importar config
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import optimization_config
+from app.models.formatting import format_cell
 
-def _format_value(value: Any) -> str:
-    if pd.isna(value):
-        return ""
-    if isinstance(value, float):
-        if math.isinf(value):
-            return ""
-        if value == int(value):
-            return str(int(value))
-        return str(value).replace(".", ",")
-    return str(value)
-
+logger = logging.getLogger(__name__)
 
 class VirtualizedPandasModel(QAbstractTableModel):
     """
     Modelo optimizado que adapta un DataFrame de Pandas para QTableView
     Implementa paginación virtual para manejar datasets grandes eficientemente
+
+    El modelo es de solo lectura sobre el dataset que recibe: no reordena ni
+    filtra datos. Cuando la vista pide ordenar, emite `sort_requested` para
+    que el dueño del estado (PaginationManager) ordene el dataset completo.
     """
+
+    sort_requested = Signal(str, bool)  # (nombre_columna, ascendente)
 
     def __init__(self, df: pd.DataFrame | None = None, chunk_size: int | None = None) -> None:
         super().__init__()
@@ -50,14 +48,8 @@ class VirtualizedPandasModel(QAbstractTableModel):
 
         # Configuración de virtualización usando configuración global
         self.enable_virtualization: bool = optimization_config.should_use_virtualization(self.total_rows)
-
-        if self.enable_virtualization:
-            print(f"Virtualización activada para dataset de {self.total_rows} filas (chunk size: {self.chunk_size})")
-        else:
-            # Si no es muy grande, usar el modelo completo
-            self.current_df = self.full_df
         
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         """
         Retornar número de filas en el DataFrame
 
@@ -71,7 +63,7 @@ class VirtualizedPandasModel(QAbstractTableModel):
             return 0
         return self.total_rows
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         """
         Retornar número de columnas en el DataFrame
 
@@ -85,7 +77,7 @@ class VirtualizedPandasModel(QAbstractTableModel):
             return 0
         return self.total_cols
     
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> str | None:
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:
         """
         Retornar datos para la celda especificada con carga bajo demanda
 
@@ -99,7 +91,7 @@ class VirtualizedPandasModel(QAbstractTableModel):
         if not index.isValid():
             return None
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             row = index.row()
             column = index.column()
 
@@ -108,18 +100,18 @@ class VirtualizedPandasModel(QAbstractTableModel):
                 # Para datos no virtualizados, acceso directo
                 if not self.enable_virtualization:
                     value = self.full_df.iloc[row, column]
-                    return _format_value(value)
+                    return format_cell(value)
                 
                 # Para datos virtualizados, usar chunk system
                 chunk_data = self._get_chunk_data(row)
                 if chunk_data is not None and column < len(chunk_data.columns):
-                    value = chunk_data.iloc[row - chunk_data.index[0], column]
-                    return _format_value(value)
+                    local_row = row - (row // self.chunk_size) * self.chunk_size
+                    value = chunk_data.iloc[local_row, column]
+                    return format_cell(value)
 
         return None
 
-    @staticmethod
-    def flags(index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         """
         Retornar flags para la celda especificada
 
@@ -130,57 +122,33 @@ class VirtualizedPandasModel(QAbstractTableModel):
             Flags de la celda
         """
         if not index.isValid():
-            return Qt.ItemFlags()
-        
-        return Qt.ItemIsSelectable | Qt.ItemIsEnabled
+            return Qt.ItemFlag()
 
-    def sort(self, column: int, order: Qt.SortOrder) -> None:
+        return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+
+    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
         """
-        Ordenar datos por la columna especificada
+        Solicitar el ordenamiento del dataset al dueño del estado.
+
+        El modelo NO reordena sus datos: solo notifica qué columna y en qué
+        dirección se pidió ordenar. DataView delega en PaginationManager,
+        que ordena el dataset completo (no la página visible).
 
         Args:
             column: Índice de la columna
-            order: Orden de clasificación (Qt.AscendingOrder o Qt.DescendingOrder)
+            order: Qt.SortOrder.AscendingOrder o Qt.SortOrder.DescendingOrder
         """
         if column < 0 or column >= self.total_cols:
             return
-        
-        # Emitir señal de inicio de ordenamiento
-        self.layoutAboutToBeChanged.emit()
-        
-        try:
-            # Obtener nombre de la columna
-            column_name = self.full_df.columns[column]
-            
-            # Manejar correctamente los enum de Qt
-            ascending = (order == Qt.AscendingOrder)
-            
-            # Ordenar DataFrame
-            sorted_df = self.full_df.sort_values(by=column_name, ascending=ascending).reset_index(drop=True)
-            
-            # Actualizar datos
-            self.full_df = sorted_df
-            
-            # Limpiar cache y datos virtualizados
-            self.data_cache.clear()
-            if hasattr(self, 'current_df'):
-                self.current_df = self.full_df
-                
-            print(f"📊 Ordenamiento aplicado: {column_name}, ascendente={ascending}")
-            
-        except Exception as e:
-            print(f"Error al ordenar: {e}")
-            # En caso de error, revertir cambios si es necesario
-        
-        # Emitir señal de fin de ordenamiento
-        self.layoutChanged.emit()
+
+        self.sort_requested.emit(str(self.full_df.columns[column]), order == Qt.SortOrder.AscendingOrder)
 
     def get_sorted_data(self) -> pd.DataFrame:
         """
-        Obtener los datos ordenados actuales
+        Obtener los datos actuales del modelo
 
         Returns:
-            DataFrame con datos ordenados
+            Copia del DataFrame mostrado por el modelo
         """
         return self.full_df.copy()
 
@@ -237,7 +205,7 @@ class VirtualizedPandasModel(QAbstractTableModel):
             for chunk_idx in chunks_to_remove:
                 del self.data_cache[chunk_idx]
     
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> str | None:
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:
         """
         Retornar datos para los encabezados
 
@@ -249,18 +217,18 @@ class VirtualizedPandasModel(QAbstractTableModel):
         Returns:
             Nombre del encabezado
         """
-        if role == Qt.DisplayRole:
-            if orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
                 # Retornar nombre de la columna
                 if section < self.total_cols:
                     return str(self.full_df.columns[section])
-            elif orientation == Qt.Vertical:
+            elif orientation == Qt.Orientation.Vertical:
                 # Retornar índice de la fila
                 return str(section + 1)
 
         return None
     
-    def setData(self, index: QModelIndex, value: object, role: int = Qt.EditRole) -> bool:
+    def setData(self, index: QModelIndex | QPersistentModelIndex, value: object, role: int = Qt.ItemDataRole.EditRole) -> bool:
         """
         Establecer datos en la celda especificada
 
@@ -272,25 +240,27 @@ class VirtualizedPandasModel(QAbstractTableModel):
         Returns:
             True si se estableció correctamente
         """
-        if not index.isValid() or role != Qt.EditRole:
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
 
         row = index.row()
         column = index.column()
 
         # Verificar que el índice está dentro del rango
-        if row < self.total_rows and column < self.total_cols:
-            # Actualizar el DataFrame completo
-            self.full_df.iloc[row, column] = value
+        if not (row < self.total_rows and column < self.total_cols):
+            return False
 
-            # Si el chunk está en cache, actualizarlo también
-            chunk_index = row // self.chunk_size
-            if chunk_index in self.data_cache:
-                chunk_start = chunk_index * self.chunk_size
-                chunk_end = min(chunk_start + self.chunk_size, self.total_rows)
-                if chunk_start <= row < chunk_end:
-                    local_row = row - chunk_start
-                    self.data_cache[chunk_index].iloc[local_row, column] = value
+        # Actualizar el DataFrame completo
+        self.full_df.iloc[row, column] = value
+
+        # Si el chunk está en cache, actualizarlo también
+        chunk_index = row // self.chunk_size
+        if chunk_index in self.data_cache:
+            chunk_start = chunk_index * self.chunk_size
+            chunk_end = min(chunk_start + self.chunk_size, self.total_rows)
+            if chunk_start <= row < chunk_end:
+                local_row = row - chunk_start
+                self.data_cache[chunk_index].iloc[local_row, column] = value
 
         # Emitir señal de que los datos han cambiado
         self.dataChanged.emit(index, index, [role])
@@ -317,7 +287,7 @@ class VirtualizedPandasModel(QAbstractTableModel):
         self.enable_virtualization = optimization_config.should_use_virtualization(self.total_rows)
 
         if self.enable_virtualization:
-            print(f"Virtualización {'activada' if self.enable_virtualization else 'desactivada'} para dataset de {self.total_rows} filas")
+            logger.debug("Virtualización %s para dataset de %s filas", self.enable_virtualization, self.total_rows)
 
         self.endResetModel()
 

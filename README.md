@@ -1,4 +1,4 @@
-# Flash View Sheet
+# Flasheet
 
 Visor de datos tabulares con soporte para archivos Excel y CSV, construido con Python 3 y PySide6.
 
@@ -20,8 +20,8 @@ Visor de datos tabulares con soporte para archivos Excel y CSV, construido con P
 ## Instalación
 
 ```bash
-git clone https://github.com/b1tcod3/flash-view-sheet.git
-cd flash-view-sheet
+git clone https://github.com/b1tcod3/flasheet.git
+cd flasheet
 pip install -r requirements.txt
 ```
 
@@ -33,20 +33,25 @@ python3 main.py
 
 ## Compilar ejecutable para Windows
 
-1. **Instalar PyInstaller**:
+1. **Instalar PyInstaller** (en Windows, con el venv activo):
    ```bash
-   pip install pyinstaller
+   pip install -r requirements.txt pyinstaller
    ```
 
-2. **Crear el ejecutable**:
+2. **Generar el ejecutable**:
    ```bash
-   pyinstaller --onefile --windowed --hidden-import=numpy --hidden-import=pandas --hidden-import=openpyxl --hidden-import=PySide6.QtCore --hidden-import=PySide6.QtGui --hidden-import=PySide6.QtWidgets --collect-all=numpy --collect-all=pandas main.py
+   python build_exe.py
    ```
 
-3. **Solución de problemas**:
-   - Si hay errores con NumPy, usar un entorno virtual limpio
-   - El parámetro `--collect-all=numpy` es crucial
-   - El ejecutable se genera en la carpeta `dist/`
+   La configuración completa (hidden imports de `pyarrow`, `tables`, `h5py`,
+   `yaml`, `sqlalchemy`, `lxml`, `reportlab`, backends de matplotlib, iconos y
+   assets) vive en `flashsheet.spec`, versionado con el código.
+
+3. **Notas**:
+   - El build debe ejecutarse en Windows: PyInstaller no compila de forma cruzada.
+   - El ejecutable se genera en `dist/` (onefile, sin consola).
+   - Si añades un import diferido nuevo (dentro de una función), añádelo a
+     `hiddenimports` en `flashsheet.spec`.
 
 ## Estructura
 

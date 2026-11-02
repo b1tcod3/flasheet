@@ -86,10 +86,9 @@ class ViewCoordinator(QObject):
 
             self.view_created.emit(view_id)
 
-        self._view_switcher.set_stacked_widget(self._stacked_widget)
-        reverse_mapping = {v: k for k, v in self._id_to_index.items()}
-        self._view_switcher.set_index_mapping(reverse_mapping)
+        self._view_switcher.set_view_mapping(self._id_to_index)
         self._stacked_widget.setCurrentIndex(0)
+        self._view_switcher.set_stacked_widget(self._stacked_widget)
         return self._views
 
     @staticmethod
@@ -155,11 +154,11 @@ class ViewCoordinator(QObject):
 
     # ==================== NAVEGACIÓN ====================
 
-    def switch_to(self, index: int) -> bool:
-        mapped = self._id_to_index.get(index)
-        if mapped is not None:
-            return self._view_switcher.switch_to(mapped)
-        return False
+    def switch_to(self, view_id: int) -> bool:
+        """Mostrar la vista indicada por su ID de ViewRegistry."""
+        if view_id not in self._id_to_index:
+            return False
+        return self._view_switcher.switch_to(view_id)
 
     def get_current_view(self) -> int:
         return self._view_switcher.get_current_view()

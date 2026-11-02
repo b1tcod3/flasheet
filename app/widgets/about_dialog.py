@@ -35,8 +35,8 @@ class AboutDialog(QDialog):
         
         # Separador
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
         
         # Descripción
@@ -76,10 +76,10 @@ class AboutDialog(QDialog):
         
         logo_path = self._get_logo_path()
         if logo_path and Path(logo_path).exists():
-            pixmap = QPixmap(logo_path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = QPixmap(logo_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             logo_label.setPixmap(pixmap)
         
-        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         return logo_label
     
     def _get_logo_path(self) -> str | None:
@@ -118,7 +118,7 @@ class AboutDialog(QDialog):
         """
         desc_label = QLabel(desc_text)
         desc_label.setWordWrap(True)
-        desc_label.setTextFormat(Qt.RichText)
+        desc_label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(desc_label)
     
     def _create_creator(self, layout: QVBoxLayout) -> None:
@@ -129,8 +129,8 @@ class AboutDialog(QDialog):
         """
         creator_label = QLabel(creator_text)
         creator_label.setWordWrap(True)
-        creator_label.setTextFormat(Qt.RichText)
-        creator_label.setStyleSheet("background-color: #f0f0f0; padding: 10px; border-radius: 5px;")
+        creator_label.setTextFormat(Qt.TextFormat.RichText)
+        creator_label.setStyleSheet("background-color: #f0f0f0; color: #333333; padding: 10px; border-radius: 5px;")
         layout.addWidget(creator_label)
     
     def _create_buttons(self, layout: QVBoxLayout) -> None:

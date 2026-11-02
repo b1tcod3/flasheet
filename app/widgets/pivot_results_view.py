@@ -25,7 +25,7 @@ class PivotTabWidget(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
 
         header = QLabel(f"{title}  ({len(df)} filas × {len(df.columns)} columnas)")
-        header.setFont(QFont("Arial", 11, QFont.Bold))
+        header.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         header.setStyleSheet("color: #1e293b; padding: 4px 0;")
         layout.addWidget(header)
 
@@ -51,7 +51,7 @@ class PivotTabWidget(QWidget):
             }
         """)
         table.horizontalHeader().setStretchLastSection(True)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         table.verticalHeader().setDefaultSectionSize(28)
         layout.addWidget(table)
 
@@ -76,7 +76,7 @@ class PivotResultsView(QWidget):
         header_layout = QHBoxLayout()
 
         title = QLabel("Tablas Pivote Automáticas")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title.setStyleSheet("color: #1e293b;")
         header_layout.addWidget(title)
         header_layout.addStretch()
@@ -108,6 +108,7 @@ class PivotResultsView(QWidget):
             }
             QTabBar::tab {
                 background: #f3f4f6;
+                color: #334155;
                 border: 1px solid #d1d5db;
                 border-bottom: none;
                 padding: 6px 16px;
@@ -128,7 +129,7 @@ class PivotResultsView(QWidget):
         main_layout.addWidget(self.tab_widget)
 
         self._empty_label = QLabel("Haz clic en el botón de Pivote en la barra de herramientas\npara generar automáticamente las tablas pivote.")
-        self._empty_label.setAlignment(Qt.AlignCenter)
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setStyleSheet("color: #94a3b8; font-size: 13px;")
         main_layout.addWidget(self._empty_label)
 

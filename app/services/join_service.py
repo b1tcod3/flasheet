@@ -7,10 +7,11 @@ servicio no mantiene estado entre llamadas.
 """
 
 import logging
-import traceback
 
 import pandas as pd
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Signal
+
+from app.services.task_thread import TaskThread
 
 from core.join.data_join_manager import DataJoinManager
 from core.join.models import JoinConfig, JoinResult, JoinType, ValidationResult
@@ -123,7 +124,7 @@ class JoinService:
         return max(0.5, min(base_time, 30.0))
 
 
-class JoinWorkerThread(QThread):
+class JoinWorkerThread(TaskThread):
     """Hilo para ejecutar un join sin bloquear la interfaz.
 
     Señales:
@@ -149,31 +150,25 @@ class JoinWorkerThread(QThread):
         self._right_df = right_df
         self._config = config
 
-    def run(self) -> None:
-        try:
-            if self.isInterruptionRequested():
-                return
+    def execute(self) -> object:
+        """Ejecutar el join reportando los hitos de progreso."""
+        self.progress_updated.emit(10)
+        if self.isInterruptionRequested():
+            return None
 
-            self.progress_updated.emit(10)
+        self.progress_updated.emit(30)
+        result = self._join_service.execute_join(
+            self._left_df, self._right_df, self._config
+        )
+        self.progress_updated.emit(100)
+        return result
 
-            if self.isInterruptionRequested():
-                return
+    def _emit_result(self, result: object) -> None:
+        self.finished.emit(result)
 
-            self.progress_updated.emit(30)
-            result = self._join_service.execute_join(
-                self._left_df, self._right_df, self._config
-            )
-
-            if self.isInterruptionRequested():
-                return
-
-            self.progress_updated.emit(100)
-            self.finished.emit(result)
-
-        except Exception as e:
-            logger.error("JoinWorkerThread error: %s\n%s", e, traceback.format_exc())
-            if not self.isInterruptionRequested():
-                self.error_occurred.emit(str(e))
+    def _emit_error(self, message: str) -> None:
+        logger.error("JoinWorkerThread error: %s", message)
+        self.error_occurred.emit(message)
 
 
 def compute_result_columns(

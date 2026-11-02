@@ -3,9 +3,15 @@ Excel Consolidator
 Handles consolidation of multiple Excel DataFrames
 """
 
+import logging
+
 import pandas as pd
 from pathlib import Path
+
+from core.models.folder_load_config import ColumnAlignmentStrategy
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 class ExcelConsolidator:
     """
@@ -148,29 +154,67 @@ class ExcelConsolidator:
 
         return alignment
 
-    def consolidate(self, alignment_method: str = 'position') -> pd.DataFrame:
+    def align_by_name(self) -> pd.DataFrame:
+        """
+        Align DataFrames by column name
+
+        Returns:
+            Consolidated DataFrame with the union of all columns
+        """
+        if not self.dataframes:
+            return pd.DataFrame()
+
+        aligned_dfs = []
+        for df_info in self.dataframes:
+            df_aligned = df_info['dataframe'].copy()
+            if df_info['source']:
+                df_aligned['__source__'] = df_info['source']
+            aligned_dfs.append(df_aligned)
+
+        consolidated = pd.concat(aligned_dfs, ignore_index=True, sort=False)
+
+        if self.column_mappings:
+            consolidated = consolidated.rename(columns=self.column_mappings)
+
+        return self._apply_column_selection(consolidated)
+
+    @staticmethod
+    def _normalize_strategy(
+        strategy: ColumnAlignmentStrategy | str,
+    ) -> ColumnAlignmentStrategy:
+        if isinstance(strategy, ColumnAlignmentStrategy):
+            return strategy
+        try:
+            return ColumnAlignmentStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(f"Unsupported alignment strategy: {strategy}") from exc
+
+    def consolidate(self, alignment: ColumnAlignmentStrategy | str = ColumnAlignmentStrategy.BY_POSITION) -> pd.DataFrame:
         """
         Consolidate all DataFrames
 
         Args:
-            alignment_method: Method to align columns ('position' or 'name')
+            alignment: Strategy to align columns (position or name)
 
         Returns:
             Consolidated DataFrame
         """
-        if alignment_method == 'position':
-            return self.align_by_position()
-        else:
-            raise ValueError(f"Unsupported alignment method: {alignment_method}")
+        strategy = self._normalize_strategy(alignment)
+        aligners: dict[ColumnAlignmentStrategy, Callable[[], pd.DataFrame]] = {
+            ColumnAlignmentStrategy.BY_POSITION: self.align_by_position,
+            ColumnAlignmentStrategy.BY_NAME: self.align_by_name,
+        }
+        return aligners[strategy]()
 
-    def consolidate_chunked(self, file_paths: list[str], alignment_method: str = 'position',
+    def consolidate_chunked(self, file_paths: list[str],
+                           alignment: ColumnAlignmentStrategy | str = ColumnAlignmentStrategy.BY_POSITION,
                            chunk_size: int = 10, progress_callback: Callable[[float], None] | None = None) -> pd.DataFrame:
         """
         Consolidate DataFrames in chunks for better memory management
 
         Args:
             file_paths: List of file paths to process
-            alignment_method: Method to align columns ('position' or 'name')
+            alignment: Strategy to align columns (position or name)
             chunk_size: Number of files to process per chunk
             progress_callback: Optional callback function for progress updates
 
@@ -191,7 +235,7 @@ class ExcelConsolidator:
 
             # Consolidate chunk
             if self.dataframes:
-                chunk_result = self.consolidate(alignment_method)
+                chunk_result = self.consolidate(alignment)
                 consolidated_chunks.append(chunk_result)
 
             # Progress callback
@@ -218,7 +262,7 @@ class ExcelConsolidator:
                 self.add_dataframe(df, Path(file_path).name)
             except Exception as e:
                 # Log error but continue with other files
-                print(f"Error loading {file_path}: {e}")
+                logger.warning("Error loading %s: %s", file_path, e)
                 continue
 
     def clear(self) -> None:

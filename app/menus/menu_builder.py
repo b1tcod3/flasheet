@@ -11,19 +11,24 @@ from PySide6.QtWidgets import QMenuBar
 from .archivo_menu import ArchivoMenu
 from .datos_menu import DatosMenu
 from .vista_menu import VistaMenu
+from app.view_manager.view_registry import ViewRegistry
 from typing import Any
 
 
 class MenuBuilder:
     """
     Builder para crear la barra de menús completa.
-    
+
     Todas las QAction se crean y gestionan como atributos de instancia.
+    Los coordinadores se reciben por constructor para no depender de la
+    estructura interna de la ventana principal.
     """
 
-    def __init__(self, parent_window: Any) -> None:
+    def __init__(self, parent_window: Any, coordinator: Any, view_coordinator: Any) -> None:
         self.parent_window = parent_window
-        self.menu_bar: QMenuBar | None = None
+        self.coordinator = coordinator
+        self.view_coordinator = view_coordinator
+        self.menu_bar: QMenuBar = QMenuBar()
 
         # Referencias a menús para actualización posterior
         self.separar_menu: Any | None = None
@@ -164,16 +169,11 @@ class MenuBuilder:
         self._build_vista_menu()
         self._build_ayuda_menu()
 
-        self._connect_actions(
-            self.parent_window.coordinator,
-            self.parent_window.view_coordinator,
-        )
+        self._connect_actions(self.coordinator, self.view_coordinator)
 
         return self.menu_bar
 
     def _build_archivo_menu(self) -> None:
-        if self.menu_bar is None:
-            return
         actions: list[QAction | None] = [
             self.abrir_action,
             self.cargar_carpeta_action,
@@ -193,8 +193,6 @@ class MenuBuilder:
         self.separar_menu.addAction(self.exportar_separado_action)
 
     def _build_datos_menu(self) -> None:
-        if self.menu_bar is None:
-            return
         self.datos_menu = DatosMenu.create(
             self.menu_bar, self.cruzar_datos_action, self.limpieza_rapida_action
         )
@@ -206,8 +204,6 @@ class MenuBuilder:
         self.tabla_pivote_menu.addAction(self.export_pivot_action)
 
     def _build_vista_menu(self) -> None:
-        if self.menu_bar is None:
-            return
         actions: list[QAction | None] = [
             self.vista_principal_action,
             self.vista_datos_action,
@@ -241,11 +237,14 @@ class MenuBuilder:
         self.pivot_simple_action.triggered.connect(coordinator.auto_pivot)
         self.export_pivot_action.triggered.connect(coordinator.exportar_resultado_pivote)
 
-        self.vista_principal_action.triggered.connect(lambda: view_coordinator.switch_to(0))
-        self.vista_datos_action.triggered.connect(lambda: view_coordinator.switch_to(1))
+        self.vista_principal_action.triggered.connect(
+            lambda: view_coordinator.switch_to(ViewRegistry.VIEW_MAIN)
+        )
+        self.vista_datos_action.triggered.connect(
+            lambda: view_coordinator.switch_to(ViewRegistry.VIEW_DATA)
+        )
         self.vista_info_action.triggered.connect(coordinator.mostrar_info)
 
-        from app.view_manager.view_registry import ViewRegistry
         self.vista_perfil_action.triggered.connect(
             lambda: view_coordinator.switch_to(ViewRegistry.VIEW_PROFILING)
         )

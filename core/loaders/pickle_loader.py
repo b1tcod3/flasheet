@@ -10,6 +10,8 @@ from typing import Any
 import pandas as pd
 
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class RestrictedUnpickler(pickle.Unpickler):
     """
@@ -110,7 +112,7 @@ class PickleLoader(FileLoader):
 
         return obj
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Pickle file into DataFrame
         
@@ -121,6 +123,9 @@ class PickleLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
         try:
             # Load Pickle file
             df = self._safe_load_pickle()
@@ -136,7 +141,7 @@ class PickleLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading Pickle file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading Pickle file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """

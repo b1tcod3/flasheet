@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class JsonLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class JsonLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.json']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load JSON file into DataFrame
         
@@ -27,6 +29,9 @@ class JsonLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
         try:
             # Load JSON file
             df = pd.read_json(self.filepath)
@@ -42,7 +47,7 @@ class JsonLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading JSON file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading JSON file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """

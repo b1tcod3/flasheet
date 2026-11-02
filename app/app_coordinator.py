@@ -5,21 +5,25 @@ Coordinador central que maneja la lógica de negocio y la orquestación
 entre servicios, diálogos y vistas.
 """
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 from pathlib import Path
 
 import pandas as pd
 from matplotlib.figure import Figure
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import (QMessageBox, QFileDialog, QInputDialog,
-                                QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                QComboBox, QPushButton, QApplication)
+from PySide6.QtCore import QThread
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from app.services import DataService, ExportService, PivotService, CleaningService, JoinService
+from app.services.pivot_service import PivotWorkerThread
 from app.services.visualization_service import VisualizerWorkerThread
 from app.services.recent_files_service import RecentFilesService
 from app.services.data_service import DataLoaderThread, FolderLoaderThread
 from app.services.profiler_service import ProfilerWorkerThread
+from app.services.multi_load_session import MultiLoadSession
+from app.widgets.export_dialog import ExportDialog, ExportFormat, prompt_table_name
+from app.services.task_thread import stop_thread
+from app.widgets.progress_dialog import create_progress_dialog
 from app.view_manager import ViewCoordinator, ViewRegistry
 from app.toolbar import ToolbarManager
 from app.widgets import JoinDialog, FolderLoadDialog, CSVSeparatorDialog, ExcelSheetDialog
@@ -29,6 +33,14 @@ from core.join.join_history import JoinHistory
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QMainWindow
+
+
+_EXPORT_METHODS = {
+    ExportFormat.XLSX: 'export_to_xlsx',
+    ExportFormat.CSV: 'export_to_csv',
+    ExportFormat.PDF: 'export_to_pdf',
+    ExportFormat.SQLITE: 'export_to_sql',
+}
 
 class AppCoordinator(QObject):
     """
@@ -69,12 +81,9 @@ class AppCoordinator(QObject):
         self._profiler_thread: ProfilerWorkerThread | None = None
         self._visualizer_thread: VisualizerWorkerThread | None = None
         self._active_loaders: list[DataLoaderThread] = []
-        self._pending_dfs: list[pd.DataFrame] = []
-        self._pending_paths: list[str] = []
-        self._completed_count: int = 0
-        self._error_count: int = 0
-        self._total_files: int = 0
-        self._pending_col_vis = False
+        self._pivot_thread: PivotWorkerThread | None = None
+        self._multi_session: MultiLoadSession | None = None
+        self._pending_col_vis: bool = False
     
     # ==================== CARGA DE ARCHIVO ====================
 
@@ -92,12 +101,12 @@ class AppCoordinator(QObject):
             suffix = Path(filepath).suffix.lower()
             if suffix in ('.csv', '.tsv'):
                 csv_dialog = CSVSeparatorDialog(self.parent_window)
-                if csv_dialog.exec() != QDialog.Accepted:
+                if csv_dialog.exec() != QDialog.DialogCode.Accepted:
                     return
                 self.iniciar_carga_archivo(filepath, separator=csv_dialog.get_separator())
             elif suffix in ('.xlsx', '.xls'):
                 excel_dialog = ExcelSheetDialog(filepath, self.parent_window)
-                if excel_dialog.exec() != QDialog.Accepted:
+                if excel_dialog.exec() != QDialog.DialogCode.Accepted:
                     return
                 self.iniciar_carga_archivo(filepath, sheet_name=excel_dialog.get_sheet_name())
             else:
@@ -123,8 +132,8 @@ class AppCoordinator(QObject):
 
         self._cancel_thread(self._loader_thread)
 
-        progress = self.data_service.create_progress_dialog(
-            "Cargando datos", "Cargando archivo..."
+        progress = create_progress_dialog(
+            self.parent_window, "Cargando datos", "Cargando archivo..."
         )
         progress.setMinimumDuration(500)
         progress.show()
@@ -155,11 +164,8 @@ class AppCoordinator(QObject):
         if main_view:
             main_view.clear_file_list()
 
-        self._pending_dfs = []
-        self._pending_paths = filepaths
-        self._completed_count = 0
-        self._error_count = 0
-        self._total_files = len(filepaths)
+        session = MultiLoadSession(list(filepaths))
+        self._multi_session = session
 
         for path in filepaths:
             widget = main_view.add_file_to_list(path) if main_view else None
@@ -169,8 +175,8 @@ class AppCoordinator(QObject):
                 self.status_message.emit(f"Error creando hilo para {Path(path).name}: {e}")
                 if widget:
                     widget.set_error(f"Error: {e}"[:50])
-                self._completed_count += 1
-                if self._completed_count >= self._total_files:
+                session.register_error()
+                if session.is_complete():
                     self._finalizar_carga_multiple()
                 continue
             self._active_loaders.append(thread)
@@ -184,14 +190,16 @@ class AppCoordinator(QObject):
 
     def _on_single_loaded(self, filepath: str, df: pd.DataFrame) -> None:
         """Callback individual cuando un archivo se carga exitosamente."""
-        self._pending_dfs.append(df)
+        if self._multi_session is not None:
+            self._multi_session.register_success(df)
         main_view = self.view_coordinator.get_main_view()
         if main_view:
             main_view.set_file_completed(filepath)
 
     def _on_single_error(self, filepath: str, error: str) -> None:
         """Callback individual cuando un archivo falla al cargar."""
-        self._error_count += 1
+        if self._multi_session is not None:
+            self._multi_session.register_error()
         main_view = self.view_coordinator.get_main_view()
         if main_view:
             main_view.set_file_error(filepath, f"Error: {error[:50]}")
@@ -199,80 +207,65 @@ class AppCoordinator(QObject):
 
     def _on_single_finished(self, filepath: str) -> None:
         """Callback individual cuando un hilo termina."""
-        self._completed_count += 1
         thread = next((t for t in self._active_loaders if t.filepath == filepath), None)
         if thread in self._active_loaders:
             self._active_loaders.remove(thread)
-        if self._completed_count >= len(self._pending_paths):
+        if self._multi_session is not None and self._multi_session.is_complete():
             self._finalizar_carga_multiple()
 
     def _finalizar_carga_multiple(self) -> None:
         """Consolidar todos los DataFrames cargados y actualizar la UI."""
-        if not self._pending_dfs:
+        session = self._multi_session
+        self._multi_session = None
+        if session is None:
+            return
+
+        final_df = session.consolidate()
+        if final_df is None:
             self._on_error_carga("No se pudo cargar ningún archivo")
             return
 
-        final_df = pd.concat(self._pending_dfs, ignore_index=True)
-        self.data_service.set_original_data(final_df)
-        self.data_service.set_current_data(final_df)
+        source = session.paths[-1] if session.paths else None
+        self._aplicar_dataset(final_df, source=source)
 
-        if self._pending_paths:
-            self.view_coordinator.update_main_view(self._pending_paths[-1])
-
-        self.datos_originales_cargados.emit(self.data_service.datos_originales)
-        self.datos_actualizados.emit(self.data_service.datos_actuales)
-        self.datos_disponibles.emit(True)
-
-        self.view_coordinator.switch_to(ViewRegistry.VIEW_DATA)
-        status = f"{len(self._pending_dfs)} archivos consolidados: {len(final_df)} filas"
-        if self._error_count > 0:
-            status += f" ({self._error_count} errores)"
+        status = f"{session.successful} archivos consolidados: {len(final_df)} filas"
+        if session.errors > 0:
+            status += f" ({session.errors} errores)"
         self.status_message.emit(status)
 
-        if self._pending_paths:
-            for p in self._pending_paths:
-                self.recent_files_service.add(p)
-            self.refresh_recent_files()
-
-        self._pending_dfs = []
-        self._pending_paths = []
-        self._completed_count = 0
-        self._error_count = 0
-        self._total_files = 0
-
-        self._start_profiling()
+        for path in session.paths:
+            self.recent_files_service.add(path)
+        self.refresh_recent_files()
 
     # ==================== CALLBACKS DE DATOS ====================
     
-    def _on_datos_cargados(self, df: pd.DataFrame) -> None:
-        """Manejar datos cargados exitosamente"""
+    def _aplicar_dataset(self, df: pd.DataFrame, source: str | None = None) -> None:
+        """Dejar `df` como dataset activo y refrescar todas las vistas."""
         self.data_service.set_original_data(df)
         self.data_service.set_current_data(df)
-        
-        # Actualizar MainView con info del archivo
-        self.view_coordinator.update_main_view(self.data_service.get_filepath())
-        
-        # Guardar en archivos recientes
-        filepath = self.data_service.get_filepath()
-        if filepath:
-            self.recent_files_service.add(filepath)
-            self.refresh_recent_files()
-        
-        # Emitir señales para que las vistas reaccionen
+
+        if source:
+            self.view_coordinator.update_main_view(source)
+
         self.datos_originales_cargados.emit(self.data_service.datos_originales)
         self.datos_actualizados.emit(self.data_service.datos_actuales)
         self.datos_disponibles.emit(True)
-        
-        # Phase 6: apply pending column visibility
-        if hasattr(self, '_pending_col_vis'):
-            self.view_coordinator.set_column_visibility_enabled(self._pending_col_vis)
-            del self._pending_col_vis
-        
-        # Cambiar a vista de datos
+
         self.view_coordinator.switch_to(ViewRegistry.VIEW_DATA)
-        self.status_message.emit(f"Datos cargados: {self.data_service.get_filename()}")
         self._start_profiling()
-    
+
+    def _on_datos_cargados(self, df: pd.DataFrame) -> None:
+        """Manejar datos cargados exitosamente"""
+        filepath = self.data_service.get_filepath()
+        self._aplicar_dataset(df, source=filepath)
+
+        if filepath:
+            self.recent_files_service.add(filepath)
+            self.refresh_recent_files()
+
+        self.view_coordinator.set_column_visibility_enabled(self._pending_col_vis)
+        self.status_message.emit(f"Datos cargados: {self.data_service.get_filename()}")
+
     def _on_error_carga(self, error_message: str) -> None:
         """Manejar error de carga"""
         QMessageBox.critical(self.parent_window, "Error de carga", error_message)
@@ -329,6 +322,8 @@ class AppCoordinator(QObject):
             return
 
         self._cancel_thread(self._visualizer_thread)
+        self._cancel_thread(self._pivot_thread)
+        self._pivot_thread = None
 
         view = self.view_coordinator.get_quick_visualizer_view()
         if view is None:
@@ -372,8 +367,8 @@ class AppCoordinator(QObject):
         """Procesar carga de carpeta en segundo plano"""
         self._cancel_thread(self._folder_thread)
 
-        progress = self.data_service.create_progress_dialog(
-            "Cargando carpeta", "Escaneando archivos Excel..."
+        progress = create_progress_dialog(
+            self.parent_window, "Cargando carpeta", "Escaneando archivos Excel..."
         )
         progress.setMinimumDuration(500)
         progress.show()
@@ -399,23 +394,15 @@ class AppCoordinator(QObject):
     
     def _on_folder_data_loaded(self, df: pd.DataFrame) -> None:
         """Manejar datos de carpeta cargados exitosamente"""
-        self.data_service.set_original_data(df)
-        self.data_service.set_current_data(df)
-        
-        self.view_coordinator.switch_to(ViewRegistry.VIEW_DATA)
-        
-        self.datos_originales_cargados.emit(self.data_service.datos_originales)
-        self.datos_actualizados.emit(self.data_service.datos_actuales)
-        self.datos_disponibles.emit(True)
-        
+        self._aplicar_dataset(df, source=self.data_service.get_filepath())
+
         rows, cols = df.shape
         QMessageBox.information(self.parent_window, "Éxito",
             f"Carpeta cargada exitosamente.\n\n"
             f"Filas: {rows}, Columnas: {cols}")
-        
+
         self.status_message.emit("Carpeta cargada exitosamente")
-        self._start_profiling()
-    
+
     # ==================== OPERACIONES DE JOIN ====================
     
     def abrir_cruzar_datos(self) -> None:
@@ -475,57 +462,71 @@ class AppCoordinator(QObject):
     # ==================== OPERACIONES DE PIVOTE ====================
     
     def auto_pivot(self) -> None:
-        """Generar automáticamente tablas pivote para todas las combinaciones categórica × numérica."""
+        """Generar tablas pivote en segundo plano (sin bloquear la interfaz)."""
         if not self.data_service.has_data:
             QMessageBox.warning(self.parent_window, "Advertencia",
                               "No hay datos cargados.")
             return
-        
+
         df = self.data_service.datos_actuales
         if df is None or df.empty:
             return
-        
+
         cat_cols = self.pivot_service.detect_categorical_columns(df)
         num_cols = self.pivot_service.detect_numeric_columns(df)
-        
+
         if not cat_cols or not num_cols:
             QMessageBox.information(self.parent_window, "Sin combinaciones",
                 "No se encontraron combinaciones válidas.\n\n"
                 f"Columnas categóricas: {len(cat_cols)}\n"
                 f"Columnas numéricas: {len(num_cols)}")
             return
-        
-        combos = self.pivot_service.rank_combinations(df, cat_cols, num_cols)
-        total = min(len(combos), 5)
-        
-        progress = self.data_service.create_progress_dialog(
-            "Generando pivotes", "Calculando tablas pivote...")
-        progress.setMaximum(total)
-        progress.setValue(0)
+
+        self._cancel_thread(self._pivot_thread)
+
+        progress = create_progress_dialog(
+            self.parent_window, "Generando pivotes", "Calculando tablas pivote...")
+        progress.setRange(0, 0)  # indeterminado hasta conocer el total
         progress.show()
-        QApplication.processEvents()
-        
-        def on_progress(current: int, _: int) -> None:
+
+        thread = PivotWorkerThread(df, self.pivot_service)
+        self._pivot_thread = thread
+
+        def on_progress(current: int, total: int) -> None:
+            if progress.maximum() != total:
+                progress.setRange(0, total)
             progress.setValue(current)
-            QApplication.processEvents()
-        
-        results = self.pivot_service.generate_auto_pivots(df, progress_callback=on_progress)
-        
-        progress.close()
-        
-        print(f"Resultados generados: {len(results)} pivotes")
-        for name in results:
-            print(f"  - {name}: {results[name].shape}")
-        
-        pivot_view = self.view_coordinator.get_pivot_view()
-        if pivot_view:
-            pivot_view.set_pivot_results(results)
-        
-        self.view_coordinator.switch_to(ViewRegistry.VIEW_PIVOT)
-        self.status_message.emit(
-            f"Pivotes generados: {len(results)} tablas "
-            f"({len(cat_cols)} categ × {len(num_cols)} num)")
-    
+
+        def on_results(results: object) -> None:
+            progress.close()
+            pivot_view = self.view_coordinator.get_pivot_view()
+            if pivot_view:
+                pivot_view.set_pivot_results(cast(dict[str, Any], results))
+            self.view_coordinator.switch_to(ViewRegistry.VIEW_PIVOT)
+            count = len(results) if hasattr(results, '__len__') else 0
+            self.status_message.emit(
+                f"Pivotes generados: {count} tablas "
+                f"({len(cat_cols)} categ × {len(num_cols)} num)")
+
+        def on_error(message: str) -> None:
+            progress.close()
+            QMessageBox.critical(self.parent_window, "Error",
+                                 f"Error generando pivotes: {message}")
+
+        thread.progress.connect(on_progress)
+        thread.results_ready.connect(on_results)
+        thread.error.connect(on_error)
+        thread.finished.connect(self._on_pivot_finished)
+        progress.canceled.connect(thread.requestInterruption)
+        thread.start()
+
+    def _on_pivot_finished(self) -> None:
+        """Liberar la referencia al hilo de pivotes cuando termina."""
+        thread = self._pivot_thread
+        self._pivot_thread = None
+        if thread is not None:
+            thread.deleteLater()
+
     def exportar_resultado_pivote(self) -> None:
         """Exportar resultado de pivote"""
         if not self.data_service.has_data:
@@ -546,154 +547,76 @@ class AppCoordinator(QObject):
             QMessageBox.warning(self.parent_window, "Advertencia",
                               "No hay datos cargados.")
 
-    def _exportar_con_dialogo(
-        self,
-        export_method: Any,
-        df: pd.DataFrame,
-        titulo: str,
-        filtro: str,
-        default_filename: str = "",
-        pre_dialogo: Any = None,
-    ) -> None:
-        """Flujo genérico de exportación: diálogo de archivo, servicio, mensaje."""
+    # ==================== EXPORTACIÓN ====================
+
+    def _avisar_sin_datos(self) -> None:
+        QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
+
+    def _exportar(self, df: pd.DataFrame, export_format: ExportFormat, default_filename: str) -> None:
+        """Diálogo de destino + servicio de exportación + mensaje de resultado."""
         filepath, _ = QFileDialog.getSaveFileName(
-            self.parent_window, titulo, default_filename, filtro
+            self.parent_window,
+            export_format.dialog_title,
+            default_filename,
+            export_format.file_filter,
         )
         if not filepath:
             return
 
         extra_args: tuple[Any, ...] = ()
-        if pre_dialogo:
-            result = pre_dialogo()
-            if result is None:
+        if export_format.needs_table_name:
+            table_name = prompt_table_name(self.parent_window)
+            if table_name is None:
                 return
-            extra_args = result if isinstance(result, tuple) else (result,)
+            extra_args = (table_name,)
 
+        export_method = getattr(self.export_service, _EXPORT_METHODS[export_format])
         success, message = export_method(df, filepath, *extra_args)
         if success:
             QMessageBox.information(self.parent_window, "Éxito", message)
         else:
             QMessageBox.critical(self.parent_window, "Error", message)
 
+    def exportar_desde_datos(self, export_format: ExportFormat, default_filename: str) -> None:
+        """Exportar el dataset actual en el formato indicado."""
+        df = self.data_service.datos_actuales
+        if df is None or df.empty:
+            self._avisar_sin_datos()
+            return
+        self._exportar(df, export_format, default_filename)
+
     def mostrar_dialogo_exportacion(self, default_prefix: str = "Exportacion") -> None:
         """Diálogo de exportación con selección de formato y nombre por defecto."""
         df = self.data_service.datos_actuales
         if df is None or df.empty:
-            QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
+            self._avisar_sin_datos()
             return
 
-        dialog = QDialog(self.parent_window)
-        dialog.setWindowTitle("Exportar Datos")
-        dialog.setModal(True)
-
-        layout = QVBoxLayout(dialog)
-
-        format_layout = QHBoxLayout()
-        format_layout.addWidget(QLabel("Formato:"))
-        format_combo = QComboBox()
-        format_combo.addItems(["Excel (.xlsx)", "CSV (.csv)", "PDF (.pdf)", "SQLite (.db)"])
-        format_combo.setCurrentText("Excel (.xlsx)")
-        format_layout.addWidget(format_combo)
-        layout.addLayout(format_layout)
-
-        buttons_layout = QHBoxLayout()
-        buttons_layout.addStretch()
-        export_btn = QPushButton("Exportar")
-        export_btn.clicked.connect(dialog.accept)
-        buttons_layout.addWidget(export_btn)
-        cancel_btn = QPushButton("Cancelar")
-        cancel_btn.clicked.connect(dialog.reject)
-        buttons_layout.addWidget(cancel_btn)
-        layout.addLayout(buttons_layout)
-
-        if dialog.exec() != QDialog.Accepted:
+        export_format = ExportDialog.ask(self.parent_window)
+        if export_format is None:
             return
 
         timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
-        default_filename = f"{default_prefix}_{timestamp}"
-        format_text = format_combo.currentText()
-
-        if "Excel" in format_text:
-            self._exportar_con_dialogo(
-                self.export_service.export_to_xlsx, df,
-                "Guardar como Excel", "Archivos Excel (*.xlsx)", default_filename,
-            )
-        elif "CSV" in format_text:
-            self._exportar_con_dialogo(
-                self.export_service.export_to_csv, df,
-                "Guardar como CSV", "Archivos CSV (*.csv)", default_filename,
-            )
-        elif "PDF" in format_text:
-            self._exportar_con_dialogo(
-                self.export_service.export_to_pdf, df,
-                "Guardar como PDF", "Archivos PDF (*.pdf)", default_filename,
-            )
-        elif "SQLite" in format_text:
-            def pedir_nombre_tabla() -> tuple[str] | None:
-                name, ok = QInputDialog.getText(
-                    self.parent_window, "Nombre de la tabla", "Ingresa el nombre de la tabla:")
-                return (name,) if ok and name else None
-
-            self._exportar_con_dialogo(
-                self.export_service.export_to_sql, df,
-                "Guardar como SQLite", "Bases de Datos SQLite (*.db)", default_filename,
-                pre_dialogo=pedir_nombre_tabla,
-            )
+        self._exportar(df, export_format, f"{default_prefix}_{timestamp}")
 
     def exportar_a_pdf(self) -> None:
         """Exportar a PDF"""
-        df = self.data_service.datos_actuales
-        if df is None or df.empty:
-            QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
-            return
-        self._exportar_con_dialogo(
-            self.export_service.export_to_pdf, df,
-            "Guardar como PDF", "Archivos PDF (*.pdf)", "Exportacion.pdf",
-        )
+        self.exportar_desde_datos(ExportFormat.PDF, "Exportacion.pdf")
 
     def exportar_a_xlsx(self) -> None:
         """Exportar a Excel"""
-        df = self.data_service.datos_actuales
-        if df is None or df.empty:
-            QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
-            return
-        self._exportar_con_dialogo(
-            self.export_service.export_to_xlsx, df,
-            "Guardar como Excel", "Archivos Excel (*.xlsx)", "Exportacion.xlsx",
-        )
+        self.exportar_desde_datos(ExportFormat.XLSX, "Exportacion.xlsx")
 
     def exportar_a_csv(self) -> None:
         """Exportar a CSV"""
-        df = self.data_service.datos_actuales
-        if df is None or df.empty:
-            QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
-            return
-        self._exportar_con_dialogo(
-            self.export_service.export_to_csv, df,
-            "Guardar como CSV", "Archivos CSV (*.csv)", "Exportacion.csv",
-        )
+        self.exportar_desde_datos(ExportFormat.CSV, "Exportacion.csv")
 
     def exportar_a_sql(self) -> None:
         """Exportar a SQL"""
-        df = self.data_service.datos_actuales
-        if df is None or df.empty:
-            QMessageBox.warning(self.parent_window, "Advertencia", "No hay datos para exportar.")
-            return
-
-        def pedir_nombre_tabla() -> tuple[str] | None:
-            name, ok = QInputDialog.getText(
-                self.parent_window, "Nombre de la tabla", "Ingresa el nombre de la tabla:")
-            return (name,) if ok and name else None
-
-        self._exportar_con_dialogo(
-            self.export_service.export_to_sql, df,
-            "Guardar como Base de Datos SQL", "Bases de Datos SQLite (*.db)", "Exportacion.db",
-            pre_dialogo=pedir_nombre_tabla,
-        )
+        self.exportar_desde_datos(ExportFormat.SQLITE, "Exportacion.db")
 
     def exportar_a_imagen(self) -> None:
-        """Exportar a imagen — redirige al diálogo genérico hasta implementar export_to_image directa."""
-        # TODO: Obtener table_widget de view_coordinator y llamar export_to_image(table_widget, filepath)
+        """Exportar a imagen — pendiente de implementar export_to_image directa."""
         self.mostrar_dialogo_exportacion("Exportacion_Imagen")
 
     def exportar_datos_separados(self) -> None:
@@ -703,11 +626,11 @@ class AppCoordinator(QObject):
                               "No hay datos para exportar.")
             return
 
-        from app.widgets.export_separated_dialog import ExportSeparatedDialog
+        from app.widgets.export_separated import ExportSeparatedDialog
 
         df = self.data_service.datos_actuales
         dialog = ExportSeparatedDialog(df, self.parent_window)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
         config = dialog.get_configuration(validate=False)
@@ -830,15 +753,9 @@ class AppCoordinator(QObject):
     # ==================== THREAD CLEANUP ====================
 
     @staticmethod
-    def _cancel_thread(thread: DataLoaderThread | FolderLoaderThread | ProfilerWorkerThread | VisualizerWorkerThread | None) -> None:
-        """Detener un hilo de forma segura si está corriendo."""
-        if thread is None or not thread.isRunning():
-            return
-        thread.requestInterruption()
-        thread.quit()
-        if not thread.wait(2000):
-            thread.terminate()
-            thread.wait(1000)
+    def _cancel_thread(thread: QThread | None) -> None:
+        """Detener un hilo de forma cooperativa (nunca con terminate())."""
+        stop_thread(thread)
 
     def _on_loader_finished(self) -> None:
         self._loader_thread = None
@@ -862,8 +779,7 @@ class AppCoordinator(QObject):
         self._folder_thread = None
         self._profiler_thread = None
         self._visualizer_thread = None
-        self._pending_dfs.clear()
-        self._pending_paths.clear()
+        self._multi_session = None
 
         # 1. Desconectar señales de manera segura
         for sig in (self.status_message, self.datos_originales_cargados,

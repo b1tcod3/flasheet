@@ -23,6 +23,21 @@ HOW_MAP = {
 }
 
 
+def safe_sort_values(df: pd.DataFrame, column: str, ascending: bool = True) -> pd.DataFrame:
+    """Ordenar por `column` tolerando columnas con tipos mixtos (int + str).
+
+    pandas lanza TypeError al comparar tipos no homogéneos; en ese caso se
+    ordena por la representación textual sin alterar los valores.
+    """
+    try:
+        return df.sort_values(
+            by=column, ascending=ascending, kind='stable', na_position='last'
+        )
+    except TypeError:
+        keys = df[column].astype(str)
+        return df.loc[keys.sort_values(ascending=ascending, kind='stable').index]
+
+
 class DataJoinManager:
     """Clase principal responsable de ejecutar operaciones de cruce entre datasets"""
 
@@ -275,7 +290,7 @@ class DataJoinManager:
             result = result.drop(columns=['_merge'])
 
         if config.sort_results and config.left_keys:
-            result = result.sort_values(config.left_keys[0])
+            result = safe_sort_values(result, config.left_keys[0])
 
         return self._apply_include_columns(result, config)
 
@@ -487,7 +502,7 @@ class DataJoinManager:
         if config.sort_results and config.left_keys:
             sort_key = config.left_keys[0] if not swap_order else config.right_keys[0]
             if sort_key in final_result.columns:
-                final_result = final_result.sort_values(sort_key)
+                final_result = safe_sort_values(final_result, sort_key)
 
         return self._apply_include_columns(final_result, config)
 

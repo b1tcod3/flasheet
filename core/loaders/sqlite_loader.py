@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class SqliteLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class SqliteLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.db', '.sqlite', '.sqlite3']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None, table_name: str | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load SQLite database into DataFrame
         
@@ -28,6 +30,10 @@ class SqliteLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
+        table_name = opts.table_name
         try:
             # If no table name provided, get the first table
             if table_name is None:
@@ -54,7 +60,7 @@ class SqliteLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading SQLite file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading SQLite file {self.filepath}: {str(e)}") from e
 
     def _get_first_table(self) -> str | None:
         """
@@ -128,10 +134,12 @@ class SqliteLoader(FileLoader):
         """
         return True
 
-    def load_in_chunks(self, chunk_size: int = 1000) -> pd.DataFrame:
+    def load_in_chunks(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load SQLite file in chunks
         """
+        opts = options or LoadOptions()
+        chunk_size = opts.chunk_size
         try:
             import sqlalchemy as sa
             engine = sa.create_engine(f'sqlite:///{self.filepath}')
@@ -159,7 +167,7 @@ class SqliteLoader(FileLoader):
             return pd.concat(chunk_list, ignore_index=True)
             
         except Exception as e:
-            raise Exception(f"Error loading SQLite file in chunks: {str(e)}")
+            raise LoaderError(f"Error loading SQLite file in chunks: {str(e)}") from e
 
     def get_table_names(self) -> list[str]:
         """

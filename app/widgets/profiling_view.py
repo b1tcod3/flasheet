@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from app.resources import get_asset_path
+from app.widgets.widget_utils import dispose_widget
 
 _BG_COLOR = "#f8fafc"
 _BORDER_COLOR = "#e2e8f0"
@@ -50,7 +51,7 @@ class _PercentBar(QWidget):
 
         self._label = QLabel(f"{percent:.1f}%")
         self._label.setFixedWidth(52)
-        self._label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._label.setStyleSheet(f"color: {_BODY_COLOR}; font-size: 11px;")
         layout.addWidget(self._label)
 
@@ -89,7 +90,7 @@ class ProfilingView(QWidget):
         main_layout.setSpacing(12)
 
         header = QLabel("Perfil de Datos")
-        header.setFont(QFont("Arial", 14, QFont.Bold))
+        header.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         header.setStyleSheet(f"color: {_TITLE_COLOR};")
         main_layout.addWidget(header)
 
@@ -98,7 +99,7 @@ class ProfilingView(QWidget):
         main_layout.addWidget(self._summary_label)
 
         self._status_label = QLabel("Carga un archivo para ver su perfil de datos.")
-        self._status_label.setAlignment(Qt.AlignCenter)
+        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status_label.setStyleSheet(f"color: {_MUTED_COLOR}; font-size: 13px;")
         main_layout.addWidget(self._status_label)
 
@@ -185,9 +186,7 @@ class ProfilingView(QWidget):
     def _clear_cards(self) -> None:
         while self._cards_layout.count() > 1:
             item = self._cards_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
+            dispose_widget(item.widget())
 
     @staticmethod
     def _create_separator() -> QFrame:
@@ -212,7 +211,7 @@ class ProfilingView(QWidget):
 
         header = QHBoxLayout()
         name_label = QLabel(name)
-        name_label.setFont(QFont("Arial", 11, QFont.Bold))
+        name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         name_label.setStyleSheet(f"color: {_TITLE_COLOR}; border: none;")
         header.addWidget(name_label)
         header.addStretch()
@@ -234,14 +233,14 @@ class ProfilingView(QWidget):
         rows.addWidget(self._metric_label("Nulos"), 0, 0)
         rows.addWidget(_PercentBar(null_percent), 0, 1)
         rows.addWidget(self._metric_label(f"{null_count:,}"), 0, 2,
-                       alignment=Qt.AlignRight)
+                       alignment=Qt.AlignmentFlag.AlignRight)
 
         unique_count = profile.get('unique_count', 0)
         unique_percent = profile.get('unique_percent', 0.0)
         rows.addWidget(self._metric_label("Únicos"), 1, 0)
         rows.addWidget(_PercentBar(unique_percent), 1, 1)
         rows.addWidget(self._metric_label(f"{unique_count:,}"), 1, 2,
-                       alignment=Qt.AlignRight)
+                       alignment=Qt.AlignmentFlag.AlignRight)
 
         rows.setColumnStretch(0, 0)
         rows.setColumnStretch(1, 1)
@@ -308,7 +307,7 @@ class ProfilingView(QWidget):
 
         header = QHBoxLayout()
         name_label = QLabel(name)
-        name_label.setFont(QFont("Arial", 11, QFont.Bold))
+        name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         name_label.setStyleSheet(f"color: {_TITLE_COLOR}; border: none;")
         header.addWidget(name_label)
         header.addStretch()
@@ -402,7 +401,7 @@ class ProfilingView(QWidget):
             value_label.setStyleSheet(f"color: {_BODY_COLOR}; font-size: 11px; border: none;")
 
             count_label = QLabel(f"{count:,}")
-            count_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             count_label.setStyleSheet(
                 f"color: {_MUTED_COLOR}; font-size: 11px; border: none; "
                 f"font-family: monospace;"

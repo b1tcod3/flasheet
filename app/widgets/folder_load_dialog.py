@@ -3,6 +3,8 @@ Folder Load Dialog
 Dialog for configuring folder loading with multiple Excel files
 """
 
+import logging
+
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QGroupBox, QDialogButtonBox,
                                QListWidget, QListWidgetItem, QCheckBox,
@@ -14,6 +16,8 @@ from pathlib import Path
 from core.loaders.folder_loader import FolderLoader
 from core.models.folder_load_config import FolderLoadConfig
 from .column_alignment_preview import ColumnAlignmentPreview
+
+logger = logging.getLogger(__name__)
 
 class FolderLoadDialog(QDialog):
     """
@@ -41,7 +45,7 @@ class FolderLoadDialog(QDialog):
         folder_layout = QHBoxLayout(folder_group)
 
         self.folder_path_label = QLabel("Ninguna carpeta seleccionada")
-        self.folder_path_label.setStyleSheet("border: 1px solid #ccc; padding: 5px;")
+        self.folder_path_label.setStyleSheet("border: 1px solid #ccc; color: #334155; padding: 5px;")
 
         self.select_folder_btn = QPushButton("Seleccionar Carpeta...")
         self.select_folder_btn.clicked.connect(self.select_folder)
@@ -52,7 +56,7 @@ class FolderLoadDialog(QDialog):
         main_layout.addWidget(folder_group)
 
         # Splitter for main content
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
 
         # File selection section
         file_group = QGroupBox("Archivos Excel Encontrados")
@@ -91,7 +95,7 @@ class FolderLoadDialog(QDialog):
         main_layout.addWidget(splitter)
 
         # Dialog buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         main_layout.addWidget(buttons)
@@ -100,7 +104,7 @@ class FolderLoadDialog(QDialog):
         """Connect widget signals"""
         # File selection changes should update preview
         for checkbox in self.file_checkboxes.values():
-            checkbox.stateChanged.connect(self.update_alignment_preview)
+            checkbox.checkStateChanged.connect(self.update_alignment_preview)
 
     def select_folder(self) -> None:
         """Open folder selection dialog"""
@@ -137,7 +141,7 @@ class FolderLoadDialog(QDialog):
             item = QListWidgetItem(self.file_list)
             checkbox = QCheckBox(filename)
             checkbox.setChecked(True)  # Default to selected
-            checkbox.stateChanged.connect(self.update_alignment_preview)
+            checkbox.checkStateChanged.connect(self.update_alignment_preview)
             self.file_list.setItemWidget(item, checkbox)
 
             self.file_checkboxes[filename] = checkbox
@@ -165,7 +169,7 @@ class FolderLoadDialog(QDialog):
                 selected_metadata.append(meta)
             except Exception as e:
                 # Skip files that can't be read
-                print(f"Warning: Could not read metadata for {file_path}: {e}")
+                logger.warning("No se pudo leer metadata de %s: %s", file_path, e)
                 continue
 
         self.alignment_preview.set_file_metadata(selected_metadata)

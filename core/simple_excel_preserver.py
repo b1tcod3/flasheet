@@ -3,10 +3,14 @@ Solución simplificada para preservar formato Excel sin usar deepcopy.
 Evita problemas de recursión infinita.
 """
 
+import logging
+
 import openpyxl
 from openpyxl.utils import coordinate_to_tuple, column_index_from_string
 from typing import Any
 import copy
+
+logger = logging.getLogger(__name__)
 
 class SimpleExcelFormatPreserver:
     """Versión simplificada para preservar formato sin problemas de recursión"""
@@ -77,7 +81,7 @@ class SimpleExcelFormatPreserver:
             SimpleExcelFormatPreserver._restore_alignment(cell, format_info)
             SimpleExcelFormatPreserver._restore_number_format(cell, format_info)
         except Exception as e:
-            print(f"Warning: No se pudo restaurar formato completo: {e}")
+            logger.warning("No se pudo restaurar formato completo: %s", e)
 
     @staticmethod
     def _restore_font(cell: Any, format_info: dict[str, Any]) -> None:
@@ -220,7 +224,7 @@ class SimpleExcelFormatPreserver:
                 cell = worksheet[cell_coord]
                 self.restore_cell_format(cell, format_info)
             except Exception as e:
-                print(f"Warning: No se pudo restaurar formato de {cell_coord}: {e}")
+                logger.warning("No se pudo restaurar formato de %s: %s", cell_coord, e)
         
         # Heredar formato de la fila de encabezados hacia las filas de datos
         self._inherit_header_format(worksheet, column_mapping, start_cell, max_rows, set(area_backup))
@@ -331,5 +335,5 @@ def create_excel_with_simple_format_preservation(template_path: str, output_path
         return True
         
     except Exception as e:
-        print(f"Error creando archivo con formato preservado: {e}")
+        logger.error("Error creando archivo con formato preservado: %s", e)
         return False

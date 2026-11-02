@@ -4,9 +4,20 @@ Servicio de Tablas Pivote - PivotService
 Servicio para operaciones de tablas pivote automáticas.
 """
 
+import logging
+
+import logging
 from typing import Any, Callable
+
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
+from PySide6.QtCore import Signal
+
+from app.services.task_thread import TaskThread
+
+logger = logging.getLogger(__name__)
+
+logger = logging.getLogger(__name__)
 
 MAX_PIVOT_TABS = 5
 
@@ -58,13 +69,13 @@ class PivotService:
         cat_cols = self.detect_categorical_columns(df)
         num_cols = self.detect_numeric_columns(df)
 
-        print(f"Columnas categóricas detectadas: {cat_cols}")
-        print(f"Columnas numéricas detectadas: {num_cols}")
+        logger.debug("Columnas categóricas detectadas: %s", cat_cols)
+        logger.debug("Columnas numéricas detectadas: %s", num_cols)
 
         combos = self.rank_combinations(df, cat_cols, num_cols)
         top_combos = combos[:MAX_PIVOT_TABS]
 
-        print(f"Top {len(top_combos)} combinaciones: {[(c, n) for c, n, _ in top_combos]}")
+        logger.debug("Top %s combinaciones: %s", len(top_combos), [(c, n) for c, n, _ in top_combos])
 
         results: dict[str, pd.DataFrame] = {}
         total = len(top_combos)
@@ -94,7 +105,7 @@ class PivotService:
                 results[name] = pivot_df
 
             except Exception as e:
-                print(f"Error generando pivote para {cat} × {num}: {str(e)}")
+                logger.error("Error generando pivote para %s × %s: %s", cat, num, e)
 
             idx += 1
             if progress_callback:
@@ -104,7 +115,7 @@ class PivotService:
             first_key = next(iter(results))
             self.last_result = results[first_key]
         else:
-            print("No se generó ningún resultado pivote.")
+            logger.warning("No se generó ningún resultado pivote.")
 
         return results
 
@@ -116,3 +127,40 @@ class PivotService:
             'columns': len(self.last_result.columns),
             'shape': self.last_result.shape,
         }
+
+
+class PivotWorkerThread(TaskThread):
+    """Genera las tablas pivote fuera del hilo de la interfaz.
+
+    Señales:
+        progress(int, int): (completadas, total).
+        results_ready(object): Dict nombre -> DataFrame con las tablas.
+        error(str): Mensaje de error si falla el cálculo.
+    """
+
+    progress = Signal(int, int)
+    results_ready = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, df: pd.DataFrame, service: PivotService) -> None:
+        super().__init__()
+        self._df = df
+        self._service = service
+
+    def execute(self) -> object:
+        return self._service.generate_auto_pivots(
+            self._df, progress_callback=self._report_progress
+        )
+
+    def _report_progress(self, current: int, total: int) -> None:
+        if not self.isInterruptionRequested():
+            self.progress.emit(current, total)
+
+    def _emit_result(self, result: object) -> None:
+        self.results_ready.emit(result)
+
+    def _emit_error(self, message: str) -> None:
+        self.error.emit(message)
+
+
+__all__ = ['MAX_PIVOT_TABS', 'PivotService', 'PivotWorkerThread']

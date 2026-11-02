@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class CsvLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class CsvLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.csv', '.tsv']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None, separator: str | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load CSV/TSV file into DataFrame
         
@@ -28,6 +30,10 @@ class CsvLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
+        separator = opts.separator
         try:
             # Determine separator: explicit > extension-based > default comma
             if separator is not None:
@@ -51,7 +57,7 @@ class CsvLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading CSV/TSV file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading CSV/TSV file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """
@@ -82,10 +88,13 @@ class CsvLoader(FileLoader):
         """
         return True
 
-    def load_in_chunks(self, chunk_size: int = 1000, separator: str | None = None) -> pd.DataFrame:
+    def load_in_chunks(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load CSV/TSV file in chunks for better memory management
         """
+        opts = options or LoadOptions()
+        chunk_size = opts.chunk_size
+        separator = opts.separator
         try:
             if separator is not None:
                 sep = separator
@@ -101,7 +110,7 @@ class CsvLoader(FileLoader):
             return pd.concat(chunk_list, ignore_index=True)
             
         except Exception as e:
-            raise Exception(f"Error loading CSV/TSV file in chunks: {str(e)}")
+            raise LoaderError(f"Error loading CSV/TSV file in chunks: {str(e)}") from e
 
     def _estimate_rows(self) -> int:
         """

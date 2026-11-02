@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class FeatherLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class FeatherLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.feather']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Feather file into DataFrame
         
@@ -27,6 +29,9 @@ class FeatherLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
         try:
             # Check if pyarrow is available
             try:
@@ -51,7 +56,7 @@ class FeatherLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading Feather file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading Feather file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """
@@ -92,10 +97,12 @@ class FeatherLoader(FileLoader):
         """
         return True
 
-    def load_in_chunks(self, chunk_size: int = 1000) -> pd.DataFrame:
+    def load_in_chunks(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Feather file in chunks
         """
+        opts = options or LoadOptions()
+        chunk_size = opts.chunk_size
         try:
             # Check if pyarrow is available
             try:
@@ -117,7 +124,7 @@ class FeatherLoader(FileLoader):
                 return df
             
         except Exception as e:
-            raise Exception(f"Error loading Feather file in chunks: {str(e)}")
+            raise LoaderError(f"Error loading Feather file in chunks: {str(e)}") from e
 
     def _estimate_rows(self) -> int:
         """

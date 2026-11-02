@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class ExcelLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class ExcelLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.xlsx', '.xls']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None, sheet_name: str | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Excel file into DataFrame
         
@@ -28,6 +30,10 @@ class ExcelLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
+        sheet_name = opts.sheet_name
         try:
             # Determine which sheet to load
             sheet = 0 if sheet_name is None else sheet_name
@@ -46,7 +52,7 @@ class ExcelLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading Excel file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading Excel file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """

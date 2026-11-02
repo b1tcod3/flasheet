@@ -14,11 +14,12 @@ from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDialog
 
 from app.resources import get_asset_path
+from app.theme import apply_light_theme
 
 from core.join.join_history import JoinHistory
 
 # Importar servicios y gestores
-from app.services import DataService, ExportService, FilterService, PivotService, CleaningService, JoinService
+from app.services import DataService, ExportService, PivotService, CleaningService, JoinService
 from app.services.recent_files_service import RecentFilesService
 from app.toolbar import ToolbarManager
 from app.view_manager import ViewCoordinator
@@ -35,7 +36,6 @@ class MainWindow(QMainWindow):
     # Instance attributes
     data_service: DataService
     export_service: ExportService
-    filter_service: FilterService
     pivot_service: PivotService
     cleaning_service: CleaningService
     toolbar_manager: ToolbarManager
@@ -67,8 +67,6 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_connections()
         self._load_initial_recent_files()
-        
-        print(f"DEBUG: MainWindow initialized with size {self.size()}")
     
     # ==================== INICIALIZACIÓN ====================
     
@@ -76,7 +74,6 @@ class MainWindow(QMainWindow):
         """Inicializar servicios centralizados"""
         self.data_service = DataService()
         self.export_service = ExportService()
-        self.filter_service = FilterService()
         self.pivot_service = PivotService()
         self.cleaning_service = CleaningService()
         self.recent_files_service = RecentFilesService()
@@ -124,7 +121,7 @@ class MainWindow(QMainWindow):
     
     def _create_menu_bar(self) -> None:
         """Crear barra de menús"""
-        self.menu_builder = MenuBuilder(self)
+        self.menu_builder = MenuBuilder(self, self.coordinator, self.view_coordinator)
         self.menu_builder.build()
         
         refs = self.menu_builder.get_menu_references()
@@ -199,14 +196,14 @@ class MainWindow(QMainWindow):
         if suffix in ('.csv', '.tsv'):
             from app.widgets.csv_separator_dialog import CSVSeparatorDialog
             csv_dialog = CSVSeparatorDialog(self)
-            if csv_dialog.exec() == QDialog.Accepted:
+            if csv_dialog.exec() == QDialog.DialogCode.Accepted:
                 separator = csv_dialog.get_separator()
             else:
                 return
         elif suffix in ('.xlsx', '.xls'):
             from app.widgets.excel_sheet_dialog import ExcelSheetDialog
             excel_dialog = ExcelSheetDialog(filepath, self)
-            if excel_dialog.exec() == QDialog.Accepted:
+            if excel_dialog.exec() == QDialog.DialogCode.Accepted:
                 sheet_name = excel_dialog.get_sheet_name()
             else:
                 return
@@ -253,6 +250,12 @@ class SafeApplication(QApplication):
 def main() -> None:
     """Función principal de la aplicación"""
     app = SafeApplication(sys.argv)
+    app.setApplicationName("FlashSheet")
+    app.setOrganizationName("FlashSheet")
+    app.setApplicationDisplayName("Flash View Sheet")
+
+    # Tema claro explícito: no depender de la paleta del sistema operativo
+    apply_light_theme(app)
 
     # Instalar manejador global de errores
     sys.excepthook = _global_exception_handler

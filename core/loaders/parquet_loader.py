@@ -7,6 +7,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 from .base_loader import FileLoader
+from .exceptions import LoaderError
+from .load_options import LoadOptions
 
 class ParquetLoader(FileLoader):
     """
@@ -16,7 +18,7 @@ class ParquetLoader(FileLoader):
     def get_supported_extensions(self) -> list[str]:
         return ['.parquet']
 
-    def load(self, skip_rows: int = 0, column_names: dict[str, str] | None = None) -> pd.DataFrame:
+    def load(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Parquet file into DataFrame
         
@@ -27,6 +29,9 @@ class ParquetLoader(FileLoader):
         Returns:
             DataFrame with loaded data
         """
+        opts = options or LoadOptions()
+        skip_rows = opts.skip_rows
+        column_names = opts.column_names
         try:
             # Check if pyarrow is available
             try:
@@ -51,7 +56,7 @@ class ParquetLoader(FileLoader):
             return df
             
         except Exception as e:
-            raise Exception(f"Error loading Parquet file {self.filepath}: {str(e)}")
+            raise LoaderError(f"Error loading Parquet file {self.filepath}: {str(e)}") from e
 
     def get_file_info(self) -> dict[str, Any]:
         """
@@ -95,10 +100,12 @@ class ParquetLoader(FileLoader):
         """
         return True
 
-    def load_in_chunks(self, chunk_size: int = 1000) -> pd.DataFrame:
+    def load_in_chunks(self, options: LoadOptions | None = None) -> pd.DataFrame:
         """
         Load Parquet file in chunks
         """
+        opts = options or LoadOptions()
+        chunk_size = opts.chunk_size
         try:
             # Check if pyarrow is available
             try:
@@ -121,7 +128,7 @@ class ParquetLoader(FileLoader):
             return pd.concat(chunk_list, ignore_index=True)
             
         except Exception as e:
-            raise Exception(f"Error loading Parquet file in chunks: {str(e)}")
+            raise LoaderError(f"Error loading Parquet file in chunks: {str(e)}") from e
 
     def _estimate_rows(self) -> int:
         """

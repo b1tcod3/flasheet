@@ -10,9 +10,11 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                   QMessageBox, QWidget, QRadioButton, QButtonGroup,
                                   QCheckBox, QLineEdit, QFileDialog, QTableWidget,
                                   QTableWidgetItem, QProgressDialog, QTabWidget, QListWidget,
-                                  QListWidgetItem, QSplitter, QAbstractButton)
+                                  QListWidgetItem, QSplitter, QAbstractButton, QAbstractItemView)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
+
+from app.services.task_thread import stop_thread
 import pandas as pd
 from pathlib import Path
 
@@ -79,8 +81,8 @@ class JoinDialog(QDialog):
 
         # Título
         title_label = QLabel("Configurar Cruce de Datos")
-        title_label.setFont(QFont("Arial", 14, QFont.Bold))
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
                 background-color: #27ae60;
@@ -266,7 +268,7 @@ class JoinDialog(QDialog):
         # Checkbox para habilitar selección de columnas
         self.select_columns_check = QCheckBox("Seleccionar columnas específicas para el resultado")
         self.select_columns_check.setChecked(False)
-        self.select_columns_check.stateChanged.connect(self.on_column_selection_changed)
+        self.select_columns_check.checkStateChanged.connect(self.on_column_selection_changed)
         group_layout.addWidget(self.select_columns_check)
 
         # Splitter para listas de columnas disponibles y seleccionadas
@@ -276,7 +278,7 @@ class JoinDialog(QDialog):
         available_group = QGroupBox("Columnas Disponibles")
         available_layout = QVBoxLayout(available_group)
         self.available_columns_list = QListWidget()
-        self.available_columns_list.setSelectionMode(QListWidget.MultiSelection)
+        self.available_columns_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         available_layout.addWidget(self.available_columns_list)
         splitter.addWidget(available_group)
 
@@ -313,7 +315,7 @@ class JoinDialog(QDialog):
         selected_group = QGroupBox("Columnas Seleccionadas")
         selected_layout = QVBoxLayout(selected_group)
         self.selected_columns_list = QListWidget()
-        self.selected_columns_list.setSelectionMode(QListWidget.MultiSelection)
+        self.selected_columns_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         selected_layout.addWidget(self.selected_columns_list)
         splitter.addWidget(selected_group)
 
@@ -484,9 +486,9 @@ class JoinDialog(QDialog):
 
         self.update_preview()
 
-    def on_column_selection_changed(self, state: int) -> None:
+    def on_column_selection_changed(self, state: Qt.CheckState) -> None:
         """Manejar cambio en selección de columnas"""
-        enabled = state == 2  # Qt.CheckState.Checked
+        enabled = state == Qt.CheckState.Checked
 
         self.available_columns_list.setEnabled(enabled)
         self.selected_columns_list.setEnabled(enabled)
@@ -726,9 +728,9 @@ class JoinDialog(QDialog):
                     self, "Cross Join grande",
                     f"El cross join generará ~{estimated_rows:,} filas.\n"
                     "¿Desea continuar?",
-                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
-                if reply == QMessageBox.No:
+                if reply == QMessageBox.StandardButton.No:
                     return
 
         # Validar antes de lanzar el hilo
@@ -744,9 +746,9 @@ class JoinDialog(QDialog):
                 self,
                 "Advertencias de Configuración",
                 warning_msg,
-                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            if reply == QMessageBox.No:
+            if reply == QMessageBox.StandardButton.No:
                 return
 
         # Deshabilitar botones
@@ -758,7 +760,7 @@ class JoinDialog(QDialog):
         self._progress_dialog = QProgressDialog(
             "Ejecutando operación de cruce...", "Cancelar", 0, 100, self
         )
-        self._progress_dialog.setWindowModality(Qt.WindowModal)
+        self._progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         self._progress_dialog.setAutoClose(False)
         self._progress_dialog.setAutoReset(False)
         self._progress_dialog.setValue(0)
@@ -779,9 +781,7 @@ class JoinDialog(QDialog):
         if self._worker and self._worker.isRunning():
             self._worker.requestInterruption()
             self._worker.quit()
-            if not self._worker.wait(3000):
-                self._worker.terminate()
-                self._worker.wait(1000)
+            stop_thread(self._worker, timeout_ms=3000)
         self._restore_buttons()
 
     def _on_join_progress(self, percent: int) -> None:

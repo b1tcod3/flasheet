@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QToolBar, QWidget, QHBoxLayout, QVBoxLayout, QLabe
 from PySide6.QtGui import QIcon
 
 from app.resources import get_asset_path
+from app.view_manager.view_registry import ViewRegistry
 from typing import TYPE_CHECKING
 
 from app.toolbar.view_switcher import ViewSwitcher
@@ -89,7 +90,7 @@ class ToolbarManager:
         layout.addWidget(title_label)
 
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)  # type: ignore[attr-defined]
+        separator.setFrameShape(QFrame.Shape.HLine)
         separator.setStyleSheet("background-color: #d4d4d4; max-height: 1px; border: none;")
         layout.addWidget(separator)
 
@@ -116,6 +117,7 @@ class ToolbarManager:
                 border: none;
                 border-radius: 4px;
                 padding: 2px;
+                color: #334155;
             }
             QPushButton:hover { background-color: #e2e8f0; }
             QPushButton:pressed { background-color: #cbd5e1; }
@@ -125,17 +127,20 @@ class ToolbarManager:
 
         self.buttons_layout.addStretch()
         section_layout = section.layout()
-        assert section_layout is not None
-        section_layout.addLayout(self.buttons_layout)  # type: ignore[attr-defined]
+        assert isinstance(section_layout, QVBoxLayout)
+        section_layout.addLayout(self.buttons_layout)
 
         return section
 
     def _create_view_switcher(self) -> None:
         self.view_switcher = ViewSwitcher(self.main_window)
 
-        self.view_switcher.view_main.connect(lambda: self._on_view_switch(0))
-        self.view_switcher.view_data.connect(lambda: self._on_view_switch(1))
-        self.view_switcher.view_joined.connect(lambda: self._on_view_switch(3))
+        self.view_switcher.view_main.connect(
+            lambda: self._on_view_switch(ViewRegistry.VIEW_MAIN))
+        self.view_switcher.view_data.connect(
+            lambda: self._on_view_switch(ViewRegistry.VIEW_DATA))
+        self.view_switcher.view_joined.connect(
+            lambda: self._on_view_switch(ViewRegistry.VIEW_JOIN))
         self.view_switcher.view_pivot.connect(self._on_pivot_requested)
         self.view_switcher.view_info.connect(self._on_info_requested)
         self.view_switcher.view_profile.connect(self._on_profile_requested)
@@ -158,12 +163,10 @@ class ToolbarManager:
 
     def _on_profile_requested(self) -> None:
         if self.view_coordinator:
-            from app.view_manager.view_registry import ViewRegistry
             self.view_coordinator.switch_to(ViewRegistry.VIEW_PROFILING)
 
     def _on_visualizer_requested(self) -> None:
         if self.view_coordinator:
-            from app.view_manager.view_registry import ViewRegistry
             self.view_coordinator.switch_to(ViewRegistry.VIEW_VISUALIZER)
 
     def _create_separar_button(self) -> None:
@@ -178,6 +181,7 @@ class ToolbarManager:
                 border: none;
                 border-radius: 4px;
                 padding: 2px;
+                color: #334155;
             }
             QPushButton:hover { background-color: #e2e8f0; }
             QPushButton:pressed { background-color: #cbd5e1; }

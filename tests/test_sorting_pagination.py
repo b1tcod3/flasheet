@@ -1,192 +1,145 @@
 #!/usr/bin/env python3
 """
-Test para verificar que el ordenamiento funciona correctamente con la paginación
+Ordenamiento con paginación.
+
+Contrato verificado aquí:
+- El orden se aplica al dataset completo, no a la página visible.
+- La página actual se conserva si sigue siendo válida.
+- El filtro activo se reaplica después de ordenar.
+- El modelo no muta datos: solo emite `sort_requested`.
 """
 
 import pandas as pd
-from app.widgets.data_view import DataView
-from app.services.pagination_manager import PaginationManager
+import pytest
+from PySide6.QtCore import Qt
+
 from app.models.pandas_model import VirtualizedPandasModel
+from app.services.filter_service import ColumnNotFoundError
+from app.services.pagination_manager import PaginationManager
+from app.widgets.data_view import DataView
 
-def create_test_data_unsorted() -> pd.DataFrame:
-    """Crear datos de prueba desordenados"""
-    data = {
-        'ID': [10, 5, 15, 3, 20, 8, 12, 1, 25, 7],  # IDs desordenados
-        'Nombre': ['J', 'E', 'O', 'D', 'T', 'H', 'L', 'A', 'Y', 'G'],
-        'Edad': [25, 30, 20, 35, 28, 22, 27, 33, 24, 29],
-        'Puntuacion': [85.5, 92.0, 78.3, 88.7, 95.1, 82.4, 90.2, 87.9, 93.6, 84.8]
-    }
-    return pd.DataFrame(data)
+PAGE_SIZE = 10
+TOTAL_ROWS = 100
 
-def test_sorting_with_pagination() -> None:
-    """Test del ordenamiento con paginación"""
-    print("=== TEST DE ORDENAMIENTO CON PAGINACIÓN ===\n")
-    
-    # Crear datos desordenados
-    df = create_test_data_unsorted()
-    print("Datos originales (desordenados):")
-    print(df.to_string(index=False))
-    print(f"\nTotal filas: {len(df)}")
-    
-    # Test con PaginationManager
-    print("\n--- Test PaginationManager ---")
-    pm = PaginationManager(df, page_size=5)  # 2 páginas de 5 filas cada una
-    
-    # Verificar página 1 original
-    pm.set_current_page(1)
-    page1_original = pm.get_page_data()
-    print(f"\nPágina 1 original - IDs: {page1_original['ID'].tolist()}")
-    
-    # Verificar página 2 original  
-    pm.set_current_page(2)
-    page2_original = pm.get_page_data()
-    print(f"Página 2 original - IDs: {page2_original['ID'].tolist()}")
-    
-    # Test VirtualizedPandasModel sorting
-    print("\n--- Test VirtualizedPandasModel Sorting ---")
-    
-    # Página 1 - sin ordenamiento
-    pm.set_current_page(1)
-    page_data = pm.get_page_data()
-    model = VirtualizedPandasModel(page_data)
-    
-    print("\nPágina 1 (sin ordenamiento):")
-    for i in range(min(3, len(page_data))):
-        cell_value = model.data(model.index(i, 0))  # Primera columna (ID)
-        print(f"  Fila {i}: {cell_value}")
-    
-    # Ordenar por ID (ascendente)
-    print("\n--- Ordenando por ID (ascendente) ---")
-    from PySide6.QtCore import Qt
-    model.sort(0, Qt.AscendingOrder)  # columna 0, orden ascendente
-    
-    # Verificar ordenamiento
-    print("Página 1 después del ordenamiento:")
-    for i in range(min(3, model.rowCount())):
-        cell_value = model.data(model.index(i, 0))
-        print(f"  Fila {i}: {cell_value}")
-    
-    # Verificar que los datos están ordenados
-    if model.rowCount() >= 2:
-        first_id = int(model.data(model.index(0, 0)))
-        second_id = int(model.data(model.index(1, 0)))
-        third_id = int(model.data(model.index(2, 0))) if model.rowCount() > 2 else None
-        
-        print("\nVerificación:")
-        print(f"  Primer ID: {first_id}")
-        print(f"  Segundo ID: {second_id}")
-        if third_id:
-            print(f"  Tercer ID: {third_id}")
-        
-        if first_id <= second_id and (third_id is None or second_id <= third_id):
-            print("  ✅ Ordenamiento ascendente correcto")
-        else:
-            print("  ❌ Error en ordenamiento ascendente")
-    
-    # Test ordenamiento descendente
-    print("\n--- Ordenando por ID (descendente) ---")
-    model.sort(0, Qt.DescendingOrder)  # columna 0, orden descendente
-    
-    print("Página 1 después de ordenamiento descendente:")
-    for i in range(min(3, model.rowCount())):
-        cell_value = model.data(model.index(i, 0))
-        print(f"  Fila {i}: {cell_value}")
-    
-    # Verificar ordenamiento descendente
-    if model.rowCount() >= 2:
-        first_id = int(model.data(model.index(0, 0)))
-        second_id = int(model.data(model.index(1, 0)))
-        third_id = int(model.data(model.index(2, 0))) if model.rowCount() > 2 else None
-        
-        if first_id >= second_id and (third_id is None or second_id >= third_id):
-            print("  ✅ Ordenamiento descendente correcto")
-        else:
-            print("  ❌ Error en ordenamiento descendente")
-    
-    return True
 
-def test_sorting_integration_with_data_view() -> None:
-    """Test de integración con DataView"""
-    print("\n=== TEST DE INTEGRACIÓN CON DATAVIEW ===\n")
-    
-    try:
-        from PySide6.QtWidgets import QApplication
-        from PySide6.QtCore import Qt
-        
-        # Crear aplicación (necesaria para GUI)
-        _ = QApplication.instance() or QApplication([])
-        
-        # Crear DataView
+def create_unsorted_df() -> pd.DataFrame:
+    """Dataset de 100 filas con valores descendentes y categorías cíclicas."""
+    return pd.DataFrame({
+        'Nombre': [f'Item_{i:03d}' for i in range(TOTAL_ROWS)],
+        'Valor': list(range(TOTAL_ROWS, 0, -1)),
+        'Categoria': [f'Cat_{i % 10}' for i in range(TOTAL_ROWS)],
+    })
+
+
+class TestPaginationManagerSorting:
+    def test_sort_by_orders_full_dataset(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+
+        manager.sort_by('Valor', ascending=True)
+
+        assert manager.original_df['Valor'].tolist() == sorted(range(1, TOTAL_ROWS + 1))
+        assert len(manager.filtered_df) == TOTAL_ROWS
+
+    def test_sort_by_descending(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+
+        manager.sort_by('Valor', ascending=False)
+
+        valores = manager.original_df['Valor'].tolist()
+        assert valores == sorted(valores, reverse=True)
+
+    def test_sort_by_preserves_current_page(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+        manager.set_current_page(3)
+
+        manager.sort_by('Valor', ascending=False)
+
+        assert manager.get_current_page() == 3
+        assert len(manager.get_page_data()) == PAGE_SIZE
+
+    def test_sort_by_resets_page_when_requested(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+        manager.set_current_page(4)
+
+        manager.sort_by('Nombre', ascending=True, preserve_page=False)
+
+        assert manager.get_current_page() == 1
+
+    def test_sort_by_reapplies_active_filter(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+        manager.apply_filter('Categoria', 'Cat_1')
+        assert len(manager.filtered_df) == TOTAL_ROWS // 10
+
+        manager.sort_by('Valor', ascending=True)
+
+        assert len(manager.filtered_df) == TOTAL_ROWS // 10
+        assert set(manager.filtered_df['Categoria']) == {'Cat_1'}
+        valores = manager.filtered_df['Valor'].tolist()
+        assert valores == sorted(valores)
+
+    def test_sort_by_unknown_column_raises(self) -> None:
+        manager = PaginationManager(create_unsorted_df(), PAGE_SIZE)
+
+        with pytest.raises(ColumnNotFoundError):
+            manager.sort_by('NoExiste', ascending=True)
+
+
+class TestModelSortContract:
+    def test_model_sort_emits_request_without_mutating(self) -> None:
+        page = create_unsorted_df().head(PAGE_SIZE)
+        model = VirtualizedPandasModel(page)
+        received: list[tuple[str, bool]] = []
+        model.sort_requested.connect(lambda name, asc: received.append((name, asc)))
+
+        model.sort(1, Qt.DescendingOrder)
+
+        assert received == [('Valor', False)]
+        assert model.full_df['Valor'].tolist() == page['Valor'].tolist()
+
+    def test_model_sort_ignores_out_of_range_column(self) -> None:
+        model = VirtualizedPandasModel(create_unsorted_df().head(PAGE_SIZE))
+        received: list[tuple[str, bool]] = []
+        model.sort_requested.connect(lambda name, asc: received.append((name, asc)))
+
+        model.sort(99, Qt.AscendingOrder)
+
+        assert received == []
+
+    def test_set_data_rejects_out_of_range_index(self) -> None:
+        model = VirtualizedPandasModel(create_unsorted_df().head(PAGE_SIZE))
+
+        assert model.setData(model.index(999, 0), 'x') is False
+
+
+class TestDataViewSortingIntegration:
+    def test_data_view_sorts_full_dataset_and_keeps_page(self) -> None:
         data_view = DataView()
-        
-        # Crear datos desordenados
-        df = create_test_data_unsorted()
-        data_view.set_data(df)
-        
-        print("Datos cargados en DataView")
-        
-        # Verificar estado inicial
-        pm = data_view.pagination_manager
-        print(f"Páginas totales: {pm.get_total_pages()}")
-        
-        # Verificar datos originales
-        pm.set_current_page(1)
-        page1_data = pm.get_page_data()
-        print(f"Página 1 inicial - IDs: {page1_data['ID'].tolist()}")
-        
-        # Simular ordenamiento en el modelo
-        model = data_view.pandas_model
-        print("\nAplicando ordenamiento al modelo...")
-        model.sort(0, Qt.AscendingOrder)  # Ordenar por ID ascendente
-        
-        # Actualizar pagination manager con datos ordenados
-        sorted_data = model.full_df
-        pm.set_data(sorted_data)
-        
-        # Verificar datos ordenados
-        pm.set_current_page(1)
-        page1_sorted = pm.get_page_data()
-        print(f"Página 1 después de ordenamiento - IDs: {page1_sorted['ID'].tolist()}")
-        
-        # Verificar que están ordenados
-        ids_sorted = page1_sorted['ID'].tolist()
-        if ids_sorted == sorted(ids_sorted):
-            print("  ✅ Datos correctamente ordenados")
-            return True
-        else:
-            print("  ❌ Error: datos no están ordenados")
-            return False
-            
-    except Exception as e:
-        print(f"Error en test de integración: {e}")
-        return False
+        data_view.set_data(create_unsorted_df())
+        manager = data_view.pagination_manager
+        assert manager is not None
+        manager.set_current_page(3)
 
-def main() -> int:
-    """Función principal"""
-    print("🔍 TEST DE ORDENAMIENTO CON PAGINACIÓN")
-    print("=" * 50)
-    
-    # Test básico de ordenamiento
-    sort_ok = test_sorting_with_pagination()
-    
-    # Test de integración (solo si el básico pasa)
-    if sort_ok:
-        integration_ok = test_sorting_integration_with_data_view()
-    else:
-        integration_ok = False
-    
-    print("\n" + "=" * 50)
-    print("📋 RESUMEN:")
-    print(f"   - Ordenamiento básico: {'✅ OK' if sort_ok else '❌ FAILED'}")
-    print(f"   - Integración DataView: {'✅ OK' if integration_ok else '❌ FAILED'}")
-    
-    if sort_ok and integration_ok:
-        print("\n🎉 ¡ORDENAMIENTO FUNCIONA CORRECTAMENTE!")
-        print("El ordenamiento está completamente implementado.")
-    else:
-        print("\n⚠️ Hay problemas con el ordenamiento.")
-    
-    return sort_ok and integration_ok
+        assert data_view.pandas_model is not None
+        data_view.pandas_model.sort(1, Qt.DescendingOrder)
 
-if __name__ == "__main__":
-    main()
+        assert manager.get_current_page() == 3
+        page_values = manager.get_page_data()['Valor'].tolist()
+        assert page_values == sorted(page_values, reverse=True)
+
+        full_values = manager.original_df['Valor'].tolist()
+        assert full_values == sorted(full_values, reverse=True)
+
+    def test_data_view_sorts_by_clicked_column_not_first(self) -> None:
+        """Regresión: antes se ordenaba siempre por la primera columna."""
+        data_view = DataView()
+        data_view.set_data(create_unsorted_df())
+
+        assert data_view.pandas_model is not None
+        data_view.pandas_model.sort(1, Qt.AscendingOrder)
+
+        manager = data_view.pagination_manager
+        assert manager is not None
+        valores = manager.original_df['Valor'].tolist()
+        assert valores == sorted(range(1, TOTAL_ROWS + 1))
+        # Si se hubiera ordenado por 'Nombre' (columna 0), 'Valor' seguiría descendente.
+        assert manager.original_df['Nombre'].tolist()[0] == 'Item_099'

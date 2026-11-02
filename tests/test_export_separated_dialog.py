@@ -107,8 +107,8 @@ class TestExportSeparatedDialog(unittest.TestCase):
         dialog = ExportSeparatedDialog(self.df_test)
 
         # Mock de QFileDialog y openpyxl
-        with patch('app.widgets.export_separated_dialog.QFileDialog.getOpenFileName') as mock_file, \
-             patch('app.widgets.export_separated_dialog.openpyxl.load_workbook') as mock_wb:
+        with patch('app.widgets.export_separated.dialog.QFileDialog.getOpenFileName') as mock_file, \
+             patch('app.widgets.export_separated.dialog.openpyxl.load_workbook') as mock_wb:
             mock_file.return_value = ('/path/to/template.xlsx', '')
             mock_workbook = MagicMock()
             mock_workbook.sheetnames = ['Sheet1', 'Sheet2']
@@ -125,7 +125,7 @@ class TestExportSeparatedDialog(unittest.TestCase):
         """Test funcionalidad de selección de carpeta de destino"""
         dialog = ExportSeparatedDialog(self.df_test)
 
-        with patch('app.widgets.export_separated_dialog.QFileDialog.getExistingDirectory') as mock_dir_dialog:
+        with patch('app.widgets.export_separated.dialog.QFileDialog.getExistingDirectory') as mock_dir_dialog:
             mock_dir_dialog.return_value = '/path/to/output'
 
             dialog.select_destination_folder()
@@ -147,7 +147,7 @@ class TestExportSeparatedDialog(unittest.TestCase):
         dialog.dest_folder_label.setText('output')
 
         # Mock ExcelTemplateSplitter para evitar dependencia
-        with patch('app.widgets.export_separated_dialog.ExcelTemplateSplitter') as mock_splitter_class:
+        with patch('app.widgets.export_separated.dialog.ExcelTemplateSplitter') as mock_splitter_class:
             mock_splitter = MagicMock()
             mock_validation_result = MagicMock()
             mock_validation_result.is_valid = True
@@ -169,7 +169,7 @@ class TestExportSeparatedDialog(unittest.TestCase):
         # No configurar nada (configuración inválida)
         
         # Mock ExcelTemplateSplitter para simular error
-        with patch('app.widgets.export_separated_dialog.ExcelTemplateSplitter') as mock_splitter_class:
+        with patch('app.widgets.export_separated.dialog.ExcelTemplateSplitter') as mock_splitter_class:
             mock_splitter = MagicMock()
             mock_validation_result = MagicMock()
             mock_validation_result.is_valid = False
@@ -320,7 +320,7 @@ class TestExportSeparatedDialog(unittest.TestCase):
         dialog.validation_result = mock_validation
         
         # Mock del diálogo de preview
-        with patch('app.widgets.export_separated_dialog.FilePreviewDialog') as mock_dialog_class:
+        with patch('app.widgets.export_separated.dialog.FilePreviewDialog') as mock_dialog_class:
             mock_dialog = MagicMock()
             mock_dialog_class.return_value = mock_dialog
             
@@ -345,7 +345,7 @@ class TestExportSeparatedDialog(unittest.TestCase):
         dialog = ExportSeparatedDialog(self.df_test)
         
         # Mock ExcelTemplateSplitter para lanzar excepción
-        with patch('app.widgets.export_separated_dialog.ExcelTemplateSplitter') as mock_splitter_class:
+        with patch('app.widgets.export_separated.dialog.ExcelTemplateSplitter') as mock_splitter_class:
             mock_splitter_class.side_effect = Exception("Error de prueba")
             
             # La validación debe manejar el error sin crashear

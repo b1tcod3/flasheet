@@ -12,8 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.data_handler import (
-    cargar_datos, obtener_metadata, obtener_estadisticas,
-    obtener_estadisticas_basicas, aplicar_filtro
+    cargar_datos, obtener_estadisticas, obtener_estadisticas_basicas
 )
 
 
@@ -80,18 +79,6 @@ class TestDataHandler(unittest.TestCase):
         with self.assertRaises(ValueError):
             cargar_datos(txt_path)
 
-    def test_obtener_metadata(self) -> None:
-        """Probar obtención de metadata"""
-        metadata = obtener_metadata(self.test_df)
-
-        # Verificar estructura de metadata
-        self.assertEqual(metadata['filas'], 5)
-        self.assertEqual(metadata['columnas'], 4)
-        self.assertEqual(len(metadata['nombres_columnas']), 4)
-        self.assertEqual(len(metadata['tipos_datos']), 4)
-        self.assertIn('Edad', metadata['columnas_numericas'])
-        self.assertIn('Nombre', metadata['columnas_texto'])
-
     def test_obtener_estadisticas_basicas(self) -> None:
         """Probar obtención de estadísticas básicas"""
         stats = obtener_estadisticas_basicas(self.test_df)
@@ -114,50 +101,6 @@ class TestDataHandler(unittest.TestCase):
         self.assertEqual(stats['total_columnas'], 0)
         self.assertEqual(stats['columnas_numericas'], 0)
         self.assertEqual(stats['columnas_texto'], 0)
-
-    def test_aplicar_filtro_simple(self) -> None:
-        """Probar aplicación de filtro simple"""
-        # Filtrar por nombre que contenga 'a'
-        filtered_df = aplicar_filtro(self.test_df, 'Nombre', 'a')
-
-        # Verificar resultados
-        self.assertEqual(len(filtered_df), 4)  # Juan, María, Ana, Carlos
-        self.assertIn('Juan', filtered_df['Nombre'].values)
-        self.assertIn('María', filtered_df['Nombre'].values)
-        self.assertIn('Ana', filtered_df['Nombre'].values)
-        self.assertIn('Carlos', filtered_df['Nombre'].values)
-
-    def test_aplicar_filtro_case_insensitive(self) -> None:
-        """Probar que el filtro es case insensitive"""
-        # Filtrar por 'MADRID' en minúsculas
-        filtered_df = aplicar_filtro(self.test_df, 'Ciudad', 'madrid')
-
-        # Verificar resultados
-        self.assertEqual(len(filtered_df), 1)
-        self.assertEqual(filtered_df['Ciudad'].iloc[0], 'Madrid')
-
-    def test_aplicar_filtro_columna_inexistente(self) -> None:
-        """Probar filtro con columna inexistente"""
-        with self.assertRaises(ValueError):
-            aplicar_filtro(self.test_df, 'ColumnaInexistente', 'test')
-
-    def test_aplicar_filtro_sin_resultados(self) -> None:
-        """Probar filtro que no produce resultados"""
-        filtered_df = aplicar_filtro(self.test_df, 'Nombre', 'xyz')
-
-        # Verificar que no hay resultados
-        self.assertEqual(len(filtered_df), 0)
-
-    def test_aplicar_filtro_con_nulos(self) -> None:
-        """Probar filtro con valores nulos"""
-        # Crear DataFrame con valores nulos
-        df_with_nulls = self.test_df.copy()
-        df_with_nulls.loc[0, 'Nombre'] = None
-
-        filtered_df = aplicar_filtro(df_with_nulls, 'Nombre', 'Juan')
-
-        # Verificar que los nulos no interfieren
-        self.assertEqual(len(filtered_df), 0)  # Juan ahora es None
 
     def test_carga_csv_grande_con_chunks(self) -> None:
         """Probar carga de CSV grande con chunks"""

@@ -1,12 +1,16 @@
 """
-Configuración de optimización para Flash View Sheet
+Configuración de optimización para Flash View Sheet.
+
+Los valores se leen de variables de entorno al construir la instancia, de modo
+que `optimization_config` puede sustituirse por otra instancia en pruebas o en
+tiempo de ejecución sin tocar el resto del código.
 """
 
 import os
 
-# Configuración de límites de memoria y rendimiento
+
 class OptimizationConfig:
-    """Configuración para optimización de rendimiento"""
+    """Configuración de límites de memoria y rendimiento"""
 
     # Límites para activar optimizaciones
     VIRTUALIZATION_THRESHOLD = 5000  # Número de filas para activar paginación virtual
@@ -32,8 +36,14 @@ class OptimizationConfig:
     PDF_MAX_ROWS = 10000  # Máximo de filas para exportación a PDF
     IMAGE_MAX_SIZE = 50 * 1024 * 1024  # 50MB máximo para exportación a imagen
 
-    @classmethod
-    def get_csv_chunk_size(cls, file_size_bytes: int) -> int:
+    # Variable de entorno que sobrescribe cada valor
+    ENV_OVERRIDES = {
+        'FLASH_CHUNK_SIZE': 'DEFAULT_CHUNK_SIZE',
+        'FLASH_CACHE_CHUNKS': 'MAX_CACHE_CHUNKS',
+        'FLASH_VIRT_THRESHOLD': 'VIRTUALIZATION_THRESHOLD',
+    }
+
+    def get_csv_chunk_size(self, file_size_bytes: int) -> int:
         """
         Obtener el tamaño de chunk apropiado basado en el tamaño del archivo
 
@@ -44,66 +54,37 @@ class OptimizationConfig:
             Tamaño de chunk en filas
         """
         if file_size_bytes > 500 * 1024 * 1024:  # > 500MB
-            return cls.CSV_CHUNK_SIZE_LARGE
-        elif file_size_bytes > 100 * 1024 * 1024:  # > 100MB
-            return cls.CSV_CHUNK_SIZE_MEDIUM
-        else:
-            return cls.CSV_CHUNK_SIZE_SMALL
+            return self.CSV_CHUNK_SIZE_LARGE
+        if file_size_bytes > 100 * 1024 * 1024:  # > 100MB
+            return self.CSV_CHUNK_SIZE_MEDIUM
+        return self.CSV_CHUNK_SIZE_SMALL
 
-    @classmethod
-    def should_use_virtualization(cls, row_count: int) -> bool:
-        """
-        Determinar si se debe usar paginación virtual
+    def should_use_virtualization(self, row_count: int) -> bool:
+        """Determinar si se debe usar paginación virtual"""
+        return row_count > self.VIRTUALIZATION_THRESHOLD
 
-        Args:
-            row_count: Número de filas en el dataset
+    def should_optimize_filtering(self, row_count: int) -> bool:
+        """Determinar si se debe optimizar el filtrado"""
+        return row_count > self.FILTER_OPTIMIZATION_THRESHOLD
 
-        Returns:
-            True si se debe usar virtualización
-        """
-        return row_count > cls.VIRTUALIZATION_THRESHOLD
-
-    @classmethod
-    def should_optimize_filtering(cls, row_count: int) -> bool:
-        """
-        Determinar si se debe optimizar el filtrado
-
-        Args:
-            row_count: Número de filas en el dataset
-
-        Returns:
-            True si se debe optimizar el filtrado
-        """
-        return row_count > cls.FILTER_OPTIMIZATION_THRESHOLD
-
-    @classmethod
-    def should_sample_stats(cls, row_count: int) -> bool:
-        """
-        Determinar si se deben usar muestras para estadísticas
-
-        Args:
-            row_count: Número de filas en el dataset
-
-        Returns:
-            True si se deben usar muestras
-        """
-        return row_count > cls.STATS_SAMPLE_THRESHOLD
+    def should_sample_stats(self, row_count: int) -> bool:
+        """Determinar si se deben usar muestras para estadísticas"""
+        return row_count > self.STATS_SAMPLE_THRESHOLD
 
 
-# Variables de entorno para configuración
 def get_config_from_env() -> OptimizationConfig:
-    """Obtener configuración desde variables de entorno"""
+    """Crear una configuración aplicando las variables de entorno definidas."""
     config = OptimizationConfig()
 
-    # Permitir configuración desde variables de entorno
-    if 'FLASH_CHUNK_SIZE' in os.environ:
-        config.DEFAULT_CHUNK_SIZE = int(os.environ['FLASH_CHUNK_SIZE'])
-
-    if 'FLASH_CACHE_CHUNKS' in os.environ:
-        config.MAX_CACHE_CHUNKS = int(os.environ['FLASH_CACHE_CHUNKS'])
-
-    if 'FLASH_VIRT_THRESHOLD' in os.environ:
-        config.VIRTUALIZATION_THRESHOLD = int(os.environ['FLASH_VIRT_THRESHOLD'])
+    for env_var, attribute in OptimizationConfig.ENV_OVERRIDES.items():
+        raw_value = os.environ.get(env_var)
+        if raw_value is None:
+            continue
+        try:
+            value = int(raw_value)
+        except ValueError:
+            continue
+        setattr(config, attribute, value)
 
     return config
 

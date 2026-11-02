@@ -13,7 +13,7 @@ from app.resources import get_asset_path
 
 def _make_vline() -> QFrame:
     line = QFrame()
-    line.setFrameShape(QFrame.VLine)  # type: ignore[attr-defined]
+    line.setFrameShape(QFrame.Shape.VLine)
     line.setStyleSheet("background-color: #c0c2c4; max-width: 1px; border: none;")
     line.setFixedWidth(4)
     return line
@@ -62,7 +62,7 @@ class ViewSwitcher(QWidget):
         icon_size = QSize(20, 20)
 
         self.view_main_btn = self._make_button(
-            style.standardIcon(QStyle.SP_DirHomeIcon),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_DirHomeIcon),
             "Vista Principal",
             icon_size
         )
@@ -71,7 +71,7 @@ class ViewSwitcher(QWidget):
         self._layout.addWidget(_make_vline())
 
         self.view_data_btn = self._make_button(
-            style.standardIcon(QStyle.SP_FileDialogContentsView),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView),
             "Vista de Datos",
             icon_size
         )
@@ -80,7 +80,7 @@ class ViewSwitcher(QWidget):
         self._layout.addWidget(_make_vline())
 
         self.view_joined_btn = self._make_button(
-            style.standardIcon(QStyle.SP_DriveNetIcon),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_DriveNetIcon),
             "Cruzar Datos",
             icon_size
         )
@@ -90,7 +90,7 @@ class ViewSwitcher(QWidget):
         self._layout.addWidget(_make_vline())
 
         self.view_pivot_btn = self._make_button(
-            style.standardIcon(QStyle.SP_FileDialogDetailedView),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView),
             "Tabla Pivote",
             icon_size
         )
@@ -100,7 +100,7 @@ class ViewSwitcher(QWidget):
         self._layout.addWidget(_make_vline())
 
         self.view_info_btn = self._make_button(
-            style.standardIcon(QStyle.SP_MessageBoxInformation),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation),
             "Ver Información del dataset",
             icon_size
         )
@@ -109,7 +109,7 @@ class ViewSwitcher(QWidget):
         self._layout.addWidget(_make_vline())
 
         self.view_profile_btn = self._make_button(
-            style.standardIcon(QStyle.SP_FileDialogListView),  # type: ignore[attr-defined]
+            style.standardIcon(QStyle.StandardPixmap.SP_FileDialogListView),
             "Perfil de Datos",
             icon_size
         )

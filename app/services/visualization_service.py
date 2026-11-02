@@ -10,7 +10,8 @@ VisualizerWorkerThread para no bloquear la interfaz.
 
 import matplotlib
 import pandas as pd
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Signal
+from app.services.task_thread import CANCELLED, TaskThread
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -174,7 +175,7 @@ class VisualizationService:
         raise ValueError(f"Tipo de gráfico no soportado: {chart_type}")
 
 
-class VisualizerWorkerThread(QThread):
+class VisualizerWorkerThread(TaskThread):
     """Hilo para generar la visualización sin bloquear la interfaz.
 
     Señales:
@@ -192,20 +193,21 @@ class VisualizerWorkerThread(QThread):
         self.x_col = x_col
         self.y_col = y_col
 
-    def run(self) -> None:
-        try:
-            if self.isInterruptionRequested():
-                return
-            fig = VisualizationService.generate_figure(
-                self.df, self.chart_type, self.x_col, self.y_col
-            )
-            if self.isInterruptionRequested():
-                fig.clf()
-                return
-            self.finished.emit(fig)
-        except Exception as e:
-            if not self.isInterruptionRequested():
-                self.error.emit(str(e))
+    def execute(self) -> object:
+        """Generar la figura y liberarla si la tarea se canceló."""
+        fig = VisualizationService.generate_figure(
+            self.df, self.chart_type, self.x_col, self.y_col
+        )
+        if self.isInterruptionRequested():
+            fig.clf()
+            return CANCELLED
+        return fig
+
+    def _emit_result(self, result: object) -> None:
+        self.finished.emit(result)
+
+    def _emit_error(self, message: str) -> None:
+        self.error.emit(message)
 
 
 __all__ = ['VisualizationService', 'VisualizerWorkerThread', 'apply_minimal_theme']

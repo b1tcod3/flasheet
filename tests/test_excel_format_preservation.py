@@ -10,7 +10,6 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Border, Alignment
 
 from core.data_handler import ExcelTemplateSplitter, ExportSeparatedConfig
-from core.excel_format_preserver import ExcelFormatPreserver
 
 
 class TestExcelFormatPreservation(unittest.TestCase):
@@ -125,38 +124,7 @@ class TestExcelFormatPreservation(unittest.TestCase):
         
         # Verificar que el formato se preservó
         self._verify_format_preservation(output_path)
-    
-    def test_format_preservation_with_preserver(self) -> None:
-        """Test de preservación usando ExcelFormatPreserver directamente"""
-        preserver = ExcelFormatPreserver()
-        
-        # Cargar plantilla original
-        original_wb = openpyxl.load_workbook(self.temp_template.name, data_only=False)
-        original_sheet = original_wb.active
-        
-        # Simular inserción de datos
-        test_data = {0: {'Region': 'Test', 'Ventas': 1234, 'Meta': 5678}}
-        preserver.insert_data_preserving_format(
-            original_sheet, 
-            test_data, 
-            {'Region': 'A', 'Ventas': 'B', 'Meta': 'C'},
-            'A5'
-        )
-        
-        # Guardar archivo de prueba
-        test_output = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-        original_wb.save(test_output.name)
-        original_wb.close()
-        
-        try:
-            # Verificar que el formato se preservó
-            self._verify_format_preservation(test_output.name, expected_value='Test')
-        finally:
-            try:
-                Path(test_output.name).unlink()
-            except:
-                pass
-    
+
     def _verify_format_preservation(self, output_path: str, expected_value: str = 'Norte') -> None:
         """Verificar que el formato se preservó en el archivo de salida"""
         # Cargar archivo de salida

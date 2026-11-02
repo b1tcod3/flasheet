@@ -1,314 +1,302 @@
 """
-Servicio de Filtros - FilterService
+FilterService - pure filtering operations for DataFrames.
 
-Servicio centralizado para operaciones de filtrado de datos
-en Flash View Sheet.
+Single source of truth for filtering semantics in the application.
+It has no Qt dependency: `PaginationManager` composes it and the UI only
+translates the resulting DataFrame into widgets.
+
+Contract: the returned DataFrame is a new object when rows are filtered out;
+the input DataFrame is never mutated.
 """
 
-from typing import Any
+from __future__ import annotations
+
+import operator
+from typing import Any, Callable
+
 import pandas as pd
+
+
+class FilterError(ValueError):
+    """Raised when a filter cannot be applied."""
+
+
+class ColumnNotFoundError(FilterError):
+    """Raised when the target column does not exist in the DataFrame."""
+
+
+_NUMERIC_OPERATORS: dict[str, Callable[[Any, Any], Any]] = {
+    '>': operator.gt,
+    '<': operator.lt,
+    '>=': operator.ge,
+    '<=': operator.le,
+    '==': operator.eq,
+    '!=': operator.ne,
+}
+
 
 class FilterService:
     """
-    Servicio para operaciones de filtrado de datos.
-    
-    Responsabilidades:
-    - Aplicar filtros a DataFrames
-    - Limpiar filtros
-    - Gestión de estados de filtro
+    Stateless filtering strategies plus an optional history of applied filters.
+
+    Responsibilities:
+    - Apply text, regex, numeric, date and value-list filters.
+    - Keep a trace of applied filters for reporting.
+
+    It does not own the data: every method receives the DataFrame to filter.
     """
-    
+
     def __init__(self) -> None:
-        """Inicializar el servicio de filtros"""
         self.filter_history: list[dict[str, Any]] = []
-    
-    def apply_filter(self, df: pd.DataFrame, column: str, term: str, case_sensitive: bool = False) -> pd.DataFrame | None:
-        """
-        Aplicar filtro a un DataFrame.
-        
-        Args:
-            df: DataFrame a filtrar
-            column: Nombre de la columna a filtrar
-            term: Término de búsqueda
-            case_sensitive: Si la búsqueda es sensible a mayúsculas
-        
-        Returns:
-            DataFrame filtrado
-        """
-        if df is None or df.empty:
-            return None
-        
-        if column not in df.columns:
-            raise ValueError(f"La columna '{column}' no existe en el DataFrame")
-        
+
+    # ==================== TEXT ====================
+
+    def apply_text_filter(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        term: str,
+        case_sensitive: bool = False,
+        record: bool = True,
+    ) -> pd.DataFrame:
+        """Filter rows whose `column` contains `term` as literal text."""
+        self._require_column(df, column)
+
         if not term:
-            return df.copy()
-        
-        try:
-            if case_sensitive:
-                mask = df[column].astype(str).str.contains(term, regex=False, na=False)
-            else:
-                mask = df[column].astype(str).str.contains(term, case=False, regex=False, na=False)
-            
-            filtered_df = df[mask].copy()
-            
-            # Guardar en historial
-            self.filter_history.append({
-                'column': column,
-                'term': term,
-                'case_sensitive': case_sensitive,
-                'original_rows': len(df),
-                'filtered_rows': len(filtered_df)
-            })
-            
-            return filtered_df
-            
-        except Exception as e:
-            raise Exception(f"Error aplicando filtro: {str(e)}")
-    
-    def apply_regex_filter(self, df: pd.DataFrame, column: str, pattern: str) -> pd.DataFrame | None:
-        """
-        Aplicar filtro con expresión regular.
-        
-        Args:
-            df: DataFrame a filtrar
-            column: Nombre de la columna
-            pattern: Patrón de expresión regular
-        
-        Returns:
-            DataFrame filtrado
-        """
-        if df is None or df.empty:
-            return None
-        
-        if column not in df.columns:
-            raise ValueError(f"La columna '{column}' no existe en el DataFrame")
-        
-        try:
-            mask = df[column].astype(str).str.contains(pattern, regex=True, na=False)
-            filtered_df = df[mask].copy()
-            
-            self.filter_history.append({
-                'column': column,
-                'term': pattern,
-                'regex': True,
-                'original_rows': len(df),
-                'filtered_rows': len(filtered_df)
-            })
-            
-            return filtered_df
-            
-        except Exception as e:
-            raise Exception(f"Error aplicando filtro regex: {str(e)}")
-    
-    def apply_numeric_filter(self, df: pd.DataFrame, column: str, operator: str, value: float) -> pd.DataFrame | None:
-        """
-        Aplicar filtro numérico.
-        
-        Args:
-            df: DataFrame a filtrar
-            column: Nombre de la columna
-            operator: Operador ('>', '<', '>=', '<=', '==', '!=')
-            value: Valor de comparación
-        
-        Returns:
-            DataFrame filtrado
-        """
-        if df is None or df.empty:
-            return None
-        
-        if column not in df.columns:
-            raise ValueError(f"La columna '{column}' no existe en el DataFrame")
-        
-        try:
-            value = float(value)
-            
-            if operator == '>':
-                mask = df[column] > value
-            elif operator == '<':
-                mask = df[column] < value
-            elif operator == '>=':
-                mask = df[column] >= value
-            elif operator == '<=':
-                mask = df[column] <= value
-            elif operator == '==':
-                mask = df[column] == value
-            elif operator == '!=':
-                mask = df[column] != value
-            else:
-                raise ValueError(f"Operador desconocido: {operator}")
-            
-            filtered_df = df[mask].copy()
-            
-            self.filter_history.append({
-                'column': column,
-                'operator': operator,
-                'value': value,
-                'type': 'numeric',
-                'original_rows': len(df),
-                'filtered_rows': len(filtered_df)
-            })
-            
-            return filtered_df
-            
-        except Exception as e:
-            raise Exception(f"Error aplicando filtro numérico: {str(e)}")
-    
-    def apply_date_filter(self, df: pd.DataFrame, column: str, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame | None:
-        """
-        Aplicar filtro por rango de fechas.
-        
-        Args:
-            df: DataFrame a filtrar
-            column: Nombre de la columna de fecha
-            start_date: Fecha de inicio (opcional)
-            end_date: Fecha de fin (opcional)
-        
-        Returns:
-            DataFrame filtrado
-        """
-        if df is None or df.empty:
-            return None
-        
-        if column not in df.columns:
-            raise ValueError(f"La columna '{column}' no existe en el DataFrame")
-        
-        try:
-            # Crear serie temporal sin modificar el df original
-            temp_dates = pd.to_datetime(df[column], errors='coerce')
+            return df
 
-            # Empezar con mask que descarta valores no convertibles (NaT)
-            mask = temp_dates.notna()
+        # Se filtra sobre los no nulos: `astype(str)` convertiría NaN en "nan",
+        # que coincidiría con búsquedas de texto que contengan "a" o "n".
+        column_values = df[column]
+        mask = column_values.notna() & column_values.astype(str).str.contains(
+            term, case=case_sensitive, regex=False, na=False
+        )
+        filtered = df[mask]
+        self._record({
+            'column': column,
+            'term': term,
+            'case_sensitive': case_sensitive,
+            'type': 'text',
+            'original_rows': len(df),
+            'filtered_rows': len(filtered),
+        }, record)
+        return filtered
 
+    def apply_filter(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        term: str,
+        case_sensitive: bool = False,
+        record: bool = True,
+    ) -> pd.DataFrame:
+        """Backwards-compatible alias for `apply_text_filter`."""
+        return self.apply_text_filter(
+            df, column, term, case_sensitive=case_sensitive, record=record
+        )
+
+    def apply_regex_filter(self, df: pd.DataFrame, column: str, pattern: str) -> pd.DataFrame:
+        """Filter rows whose `column` matches the regular expression `pattern`."""
+        self._require_column(df, column)
+
+        try:
+            column_values = df[column]
+            mask = column_values.notna() & column_values.astype(str).str.contains(
+                pattern, regex=True, na=False
+            )
+        except Exception as exc:  # invalid regex or non-string dtype
+            raise FilterError(f"Patrón regex inválido: {exc}") from exc
+
+        filtered = df[mask]
+        self._record({
+            'column': column,
+            'term': pattern,
+            'regex': True,
+            'type': 'regex',
+            'original_rows': len(df),
+            'filtered_rows': len(filtered),
+        })
+        return filtered
+
+    # ==================== NUMERIC ====================
+
+    def apply_numeric_filter(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        op: str,
+        value: float,
+    ) -> pd.DataFrame:
+        """Filter rows comparing `column` against `value` with `op`."""
+        self._require_column(df, column)
+
+        compare = _NUMERIC_OPERATORS.get(op)
+        if compare is None:
+            raise FilterError(
+                f"Operador desconocido: '{op}'. "
+                f"Válidos: {', '.join(_NUMERIC_OPERATORS)}"
+            )
+
+        try:
+            threshold = float(value)
+        except (TypeError, ValueError) as exc:
+            raise FilterError(f"Valor numérico inválido: {value!r}") from exc
+
+        # En columnas object con texto la comparación directa lanzaría TypeError:
+        # se coacciona a numérico y se descartan los valores no comparables.
+        numeric = pd.to_numeric(df[column], errors='coerce')
+        mask = compare(numeric, threshold) & numeric.notna()
+
+        filtered = df[mask]
+        self._record({
+            'column': column,
+            'operator': op,
+            'value': threshold,
+            'type': 'numeric',
+            'original_rows': len(df),
+            'filtered_rows': len(filtered),
+        })
+        return filtered
+
+    # ==================== DATES ====================
+
+    def apply_date_filter(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        """Filter rows whose `column` falls inside the given date range."""
+        self._require_column(df, column)
+
+        try:
+            dates = pd.to_datetime(df[column], errors='coerce')
+            mask = dates.notna()
             if start_date:
-                mask &= (temp_dates >= pd.to_datetime(start_date))
+                mask &= dates >= pd.to_datetime(start_date)
             if end_date:
-                mask &= (temp_dates <= pd.to_datetime(end_date))
+                mask &= dates <= pd.to_datetime(end_date)
+        except (TypeError, ValueError) as exc:
+            raise FilterError(f"Rango de fechas inválido: {exc}") from exc
 
-            filtered_df = df[mask].copy()
-            
-            self.filter_history.append({
-                'column': column,
-                'start_date': start_date,
-                'end_date': end_date,
-                'type': 'date',
-                'original_rows': len(df),
-                'filtered_rows': len(filtered_df)
-            })
-            
-            return filtered_df
-            
-        except Exception as e:
-            raise Exception(f"Error aplicando filtro de fecha: {str(e)}")
-    
-    def apply_value_filter(self, df: pd.DataFrame, column: str, values: list[Any], exclude: bool = False) -> pd.DataFrame | None:
-        """
-        Filtrar por valores específicos en una columna.
-        
-        Args:
-            df: DataFrame a filtrar
-            column: Nombre de la columna
-            values: Lista de valores a filtrar
-            exclude: Si True, excluye los valores en lugar de incluirlos
-        
-        Returns:
-            DataFrame filtrado
-        """
-        if df is None or df.empty:
-            return None
-        
-        if column not in df.columns:
-            raise ValueError(f"La columna '{column}' no existe en el DataFrame")
-        
-        try:
-            if exclude:
-                mask = ~df[column].isin(values)
-            else:
-                mask = df[column].isin(values)
-            
-            filtered_df = df[mask].copy()
-            
-            self.filter_history.append({
-                'column': column,
-                'values': values,
-                'exclude': exclude,
-                'type': 'value_list',
-                'original_rows': len(df),
-                'filtered_rows': len(filtered_df)
-            })
-            
-            return filtered_df
-            
-        except Exception as e:
-            raise Exception(f"Error aplicando filtro de valores: {str(e)}")
-    
+        filtered = df[mask]
+        self._record({
+            'column': column,
+            'start_date': start_date,
+            'end_date': end_date,
+            'type': 'date',
+            'original_rows': len(df),
+            'filtered_rows': len(filtered),
+        })
+        return filtered
+
+    # ==================== VALUE LISTS ====================
+
+    def apply_value_filter(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        values: list[Any],
+        exclude: bool = False,
+    ) -> pd.DataFrame:
+        """Keep (or exclude) rows whose `column` is one of `values`."""
+        self._require_column(df, column)
+
+        mask = df[column].isin(values)
+        if exclude:
+            mask = ~mask
+
+        filtered = df[mask]
+        self._record({
+            'column': column,
+            'values': values,
+            'exclude': exclude,
+            'type': 'value_list',
+            'original_rows': len(df),
+            'filtered_rows': len(filtered),
+        })
+        return filtered
+
+    # ==================== HISTORY ====================
+
     def clear_filters(self) -> None:
-        """Limpiar el historial de filtros"""
+        """Forget the filter history."""
         self.filter_history = []
-    
+
     def get_filter_info(self) -> dict[str, Any] | None:
-        """Obtener información sobre el último filtro aplicado"""
-        if self.filter_history:
-            return self.filter_history[-1]
-        return None
-    
+        """Return the last applied filter, if any."""
+        return self.filter_history[-1] if self.filter_history else None
+
     def get_filter_summary(self) -> str:
-        """Obtener resumen de todos los filtros aplicados"""
+        """Human readable summary of every applied filter."""
         if not self.filter_history:
             return "No hay filtros aplicados."
-        
-        summary = []
-        for i, f in enumerate(self.filter_history, 1):
-            if 'term' in f:
-                summary.append(f"{i}. Columna '{f['column']}' contiene '{f['term']}'")
-            elif 'operator' in f:
-                summary.append(f"{i}. Columna '{f['column']}' {f['operator']} {f['value']}")
-            elif 'start_date' in f:
-                dates = f"{f['start_date']} - {f['end_date']}" if f['end_date'] else f['start_date']
-                summary.append(f"{i}. Columna '{f['column']}' entre {dates}")
-            elif 'values' in f:
-                action = "excluye" if f['exclude'] else "incluye"
-                summary.append(f"{i}. Columna '{f['column']}' {action} {len(f['values'])} valores")
-        
-        return "\n".join(summary)
-    
+
+        return "\n".join(
+            f"{index}. {self._describe(entry)}"
+            for index, entry in enumerate(self.filter_history, 1)
+        )
+
+    # ==================== COLUMN INSPECTION ====================
+
     @staticmethod
     def get_unique_values(df: pd.DataFrame, column: str, limit: int = 100) -> list[Any]:
-        """Obtener valores únicos de una columna"""
-        if df is None or column not in df.columns:
+        """Return up to `limit` unique non-null values of `column`."""
+        if column not in df.columns:
             return []
-        
-        try:
-            unique = df[column].dropna().unique()
-            return unique[:limit].tolist()
-        except Exception:
-            return []
-    
+        values: list[Any] = list(df[column].dropna().unique())
+        return values[:limit]
+
     @staticmethod
     def get_column_stats(df: pd.DataFrame, column: str) -> dict[str, Any] | None:
-        """Obtener estadísticas de una columna para ayudar en filtrado"""
-        if df is None or column not in df.columns:
+        """Descriptive statistics used to build filters."""
+        if column not in df.columns:
             return None
-        
-        col = df[column]
-        
-        stats = {
-            'count': len(col),
-            'null_count': col.isna().sum(),
-            'unique_count': col.nunique(),
-            'dtype': str(col.dtype)
+
+        series = df[column]
+        stats: dict[str, Any] = {
+            'count': len(series),
+            'null_count': int(series.isna().sum()),
+            'unique_count': int(series.nunique()),
+            'dtype': str(series.dtype),
         }
-        
-        # Para columnas numéricas
-        if pd.api.types.is_numeric_dtype(col):
-            stats['min'] = col.min()
-            stats['max'] = col.max()
-            stats['mean'] = col.mean()
-            stats['median'] = col.median()
-        
-        # Para columnas de texto
-        if pd.api.types.is_string_dtype(col):
-            stats['empty_count'] = (col == '').sum()
-            stats['avg_length'] = col.astype(str).map(len).mean()
-        
+
+        if pd.api.types.is_numeric_dtype(series):
+            stats.update({
+                'min': series.min(),
+                'max': series.max(),
+                'mean': series.mean(),
+                'median': series.median(),
+            })
+
+        if pd.api.types.is_string_dtype(series):
+            stats['empty_count'] = int((series == '').sum())
+            stats['avg_length'] = series.astype(str).map(len).mean()
+
         return stats
+
+    # ==================== INTERNALS ====================
+
+    @staticmethod
+    def _require_column(df: pd.DataFrame, column: str) -> None:
+        if column not in df.columns:
+            raise ColumnNotFoundError(f"La columna '{column}' no existe en el DataFrame")
+
+    def _record(self, entry: dict[str, Any], record: bool = True) -> None:
+        if record:
+            self.filter_history.append(entry)
+
+    @staticmethod
+    def _describe(entry: dict[str, Any]) -> str:
+        column = entry.get('column')
+        kind = entry.get('type')
+        if kind == 'numeric':
+            return f"Columna '{column}' {entry['operator']} {entry['value']}"
+        if kind == 'date':
+            end = entry.get('end_date') or ''
+            return f"Columna '{column}' entre {entry.get('start_date') or ''} y {end}".strip()
+        if kind == 'value_list':
+            action = "excluye" if entry.get('exclude') else "incluye"
+            return f"Columna '{column}' {action} {len(entry['values'])} valores"
+        return f"Columna '{column}' contiene '{entry.get('term')}'"

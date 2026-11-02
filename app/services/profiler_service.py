@@ -11,8 +11,9 @@ segundo plano mediante ProfilerWorkerThread para no bloquear la interfaz.
 from typing import Any, Callable
 
 import pandas as pd
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Signal
 
+from app.services.task_thread import TaskThread
 from core.data_handler import obtener_estadisticas_basicas
 
 _MAX_TOP_VALUES_UNIQUE = 1000
@@ -280,7 +281,7 @@ class ProfilerService:
             return []
 
 
-class ProfilerWorkerThread(QThread):
+class ProfilerWorkerThread(TaskThread):
     """Hilo para calcular el perfil sin bloquear la interfaz.
 
     Señales:
@@ -297,24 +298,22 @@ class ProfilerWorkerThread(QThread):
         super().__init__()
         self.df = df
 
-    def run(self) -> None:
-        try:
-            if self.isInterruptionRequested():
-                return
-            self.progress.emit(0)
-            profiler = ProfilerService()
+    def execute(self) -> object:
+        """Calcular el perfil reportando progreso mientras se recorre."""
+        self.progress.emit(0)
+        profiler = ProfilerService()
 
-            def _report_progress(percent: int) -> None:
-                if not self.isInterruptionRequested():
-                    self.progress.emit(percent)
-
-            result = profiler.generate_profile(self.df, progress_callback=_report_progress)
-            if self.isInterruptionRequested():
-                return
-            self.finished.emit(result)
-        except Exception as e:
+        def _report_progress(percent: int) -> None:
             if not self.isInterruptionRequested():
-                self.error.emit(str(e))
+                self.progress.emit(percent)
+
+        return profiler.generate_profile(self.df, progress_callback=_report_progress)
+
+    def _emit_result(self, result: object) -> None:
+        self.finished.emit(result)
+
+    def _emit_error(self, message: str) -> None:
+        self.error.emit(message)
 
 
 def _safe_percent(count: int, total: int) -> float:

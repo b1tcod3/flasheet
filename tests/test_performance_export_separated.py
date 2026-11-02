@@ -275,7 +275,7 @@ class TestExportSeparatedPerformance(unittest.TestCase):
             'Valor1': np.random.randint(1, 1000, num_rows),
             'Valor2': np.random.uniform(0, 100, num_rows),
             'Valor3': [f'Texto_{i}' for i in range(num_rows)],
-            'Valor4': pd.date_range('2020-01-01', periods=num_rows, freq='H'),
+            'Valor4': pd.date_range('2020-01-01', periods=num_rows, freq='h'),
             'Valor5': np.random.choice(['A', 'B', 'C', 'D'], num_rows)
         })
         

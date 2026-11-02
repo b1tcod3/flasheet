@@ -26,6 +26,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+!flashsheet.spec
 
 # Installer logs
 pip-log.txt
@@ -93,6 +94,10 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Artefactos generados por los tests de exportación
+perf_test_*.xlsx
+test_[0-9][0-9].xlsx
 
 # Data files (optional - uncomment if you don't want to track sample data)
 # data/

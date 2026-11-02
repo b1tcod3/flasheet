@@ -15,7 +15,6 @@ from openpyxl.styles import Font, PatternFill, Border, Alignment
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core.data_handler import ExcelTemplateSplitter, ExportSeparatedConfig
-from core.excel_format_preserver import ExcelFormatPreserver
 
 
 def create_test_template_with_format() -> pd.DataFrame:
@@ -228,76 +227,16 @@ def verify_format_preservation(output_path: str, original_template: str) -> None
         import traceback
         traceback.print_exc()
 
-
-def test_excel_format_preserver_directly() -> None:
-    """Test directo del ExcelFormatPreserver"""
-    print("\n=== TEST DIRECTO DE EXCELFORMATPRESERVER ===")
-    
-    try:
-        # Crear preserver
-        preserver = ExcelFormatPreserver()
-        print("✓ ExcelFormatPreserver creado")
-        
-        # Crear plantilla de prueba
-        template_path = create_test_template_with_format()
-        
-        # Cargar y cachear formatos
-        wb = openpyxl.load_workbook(template_path, data_only=False)
-        sheet = wb.active
-        
-        print("✓ Caching formatos...")
-        formats_cache = preserver.cache_workbook_formats(wb)
-        print(f"  - Cached {len(formats_cache.get('worksheet_formats', {}))} worksheets")
-        print(f"  - Cached {len(formats_cache.get('cell_formats', {}))} cell formats")
-        
-        # Simular inserción de datos
-        test_data = {0: {'Region': 'Test', 'Ventas': 1234, 'Meta': 5678}}
-        
-        print("✓ Insertando datos...")
-        preserver.insert_data_preserving_format(
-            sheet, 
-            test_data, 
-            {'Region': 'A', 'Ventas': 'B', 'Meta': 'C'},
-            'A5'
-        )
-        
-        # Restaurar formatos
-        print("✓ Restaurando formatos...")
-        preserver.restore_workbook_formats(wb, formats_cache)
-        
-        # Guardar archivo de prueba
-        test_output = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-        wb.save(test_output.name)
-        wb.close()
-        
-        print("✓ Verificando resultado...")
-        verify_format_preservation(test_output.name, template_path)
-        
-        # Limpiar
-        Path(template_path).unlink()
-        Path(test_output.name).unlink()
-        
-    except Exception as e:
-        print(f"❌ Error en test directo: {e}")
-        import traceback
-        traceback.print_exc()
-
-
 def main() -> None:
     """Función principal"""
     print("🔍 DIAGNÓSTICO Y PRUEBA DE PRESERVACIÓN DE FORMATO EXCEL")
     print("=" * 60)
     
-    # Test 1: Test directo del preserver
-    test_excel_format_preserver_directly()
-    
-    # Test 2: Test completo con separación
     test_format_preservation()
     
     print("\n" + "=" * 60)
     print("✅ TESTS COMPLETADOS")
     print("\nRESUMEN:")
-    print("- Se ha implementado ExcelFormatPreserver para preservar formato")
     print("- Se ha modificado _create_excel_file_with_template para usar preservación")
     print("- Los tests verifican que el formato se mantiene durante la inserción de datos")
 

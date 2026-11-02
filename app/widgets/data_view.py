@@ -3,19 +3,37 @@ DataView - Widget principal para vista de datos con paginación y filtros integr
 Diseño moderno con botones segmentados dinámicos y barra de búsqueda minimalista.
 """
 
+import logging
+
 import pandas as pd
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableView,
                                QLineEdit, QPushButton, QLabel, QFrame,
                                QMessageBox, QSpinBox, QSizePolicy, QButtonGroup,
-                               QComboBox, QHeaderView, QStyle)
+                               QComboBox, QHeaderView, QStyle, QAbstractItemView)
 from PySide6.QtCore import Signal
 
+from app.services.filter_service import ColumnNotFoundError, FilterError
 from app.services.pagination_manager import PaginationManager
 from app.models.pandas_model import VirtualizedPandasModel
-from typing import Optional
+from app.widgets.widget_utils import dispose_widget
+from typing import Any, Optional
 
+
+logger = logging.getLogger(__name__)
 
 _MAX_QUICK_FILTER_VALUES = 5
+
+
+def _sorted_values(values: list[Any]) -> list[Any]:
+    """Ordenar valores de una columna tolerando tipos mixtos (int + str).
+
+    Un Excel real puede tener `[10, 'A-2', 50]` en la misma columna: comparar
+    directamente lanza TypeError. En ese caso se ordena por texto.
+    """
+    try:
+        return sorted(values)
+    except TypeError:
+        return sorted(values, key=str)
 
 
 class DataView(QWidget):
@@ -32,8 +50,7 @@ class DataView(QWidget):
 
         self.pagination_manager: Optional[PaginationManager] = None
         self.pandas_model: Optional[VirtualizedPandasModel] = None
-        self.original_df: Optional[pd.DataFrame] = None
-        self._sorting_in_progress: bool = False
+        self._applying_sort: bool = False
         self._quick_filter_groups: dict[str, QButtonGroup] = {}
 
         self.search_column_combo: QComboBox
@@ -94,7 +111,7 @@ class DataView(QWidget):
         search_layout.addWidget(self.search_column_combo)
 
         sep1 = QFrame()
-        sep1.setFrameShape(QFrame.VLine)
+        sep1.setFrameShape(QFrame.Shape.VLine)
         sep1.setStyleSheet("color: #e2e8f0;")
         search_layout.addWidget(sep1)
 
@@ -113,7 +130,7 @@ class DataView(QWidget):
         search_layout.addWidget(self.search_input, 1)
 
         sep2 = QFrame()
-        sep2.setFrameShape(QFrame.VLine)
+        sep2.setFrameShape(QFrame.Shape.VLine)
         sep2.setStyleSheet("color: #e2e8f0;")
         search_layout.addWidget(sep2)
 
@@ -148,13 +165,13 @@ class DataView(QWidget):
     def _create_table_section(self, parent_layout: QVBoxLayout) -> None:
         self.table_view = QTableView()
         self.table_view.setAlternatingRowColors(True)
-        self.table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_view.setSortingEnabled(True)
         self.table_view.setShowGrid(False)
-        self.table_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         header = self.table_view.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.Interactive)  # type: ignore[attr-defined]
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
 
         self.table_view.setStyleSheet("""
@@ -232,13 +249,13 @@ class DataView(QWidget):
         pagination_layout.addSpacing(12)
 
         self.first_page_btn = QPushButton()
-        self.first_page_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaSkipBackward))
+        self.first_page_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSkipBackward))
         self.prev_page_btn = QPushButton()
-        self.prev_page_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaSeekBackward))
+        self.prev_page_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward))
         self.next_page_btn = QPushButton()
-        self.next_page_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaSeekForward))
+        self.next_page_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward))
         self.last_page_btn = QPushButton()
-        self.last_page_btn.setIcon(self.style().standardIcon(QStyle.SP_MediaSkipForward))
+        self.last_page_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSkipForward))
 
         pagination_btn_style = """
             QPushButton {
@@ -268,10 +285,17 @@ class DataView(QWidget):
     # ------------------------------------------------------------------
 
     def _populate_quick_filters(self, df: pd.DataFrame) -> None:
+        self._quick_filters_container.setUpdatesEnabled(False)
+        try:
+            self._rebuild_quick_filters(df)
+        finally:
+            self._quick_filters_container.setUpdatesEnabled(True)
+
+    def _rebuild_quick_filters(self, df: pd.DataFrame) -> None:
         while self._quick_filters_layout.count():
             child = self._quick_filters_layout.takeAt(0)
             if child.widget():
-                child.widget().deleteLater()
+                dispose_widget(child.widget())
             elif child.layout():
                 self._clear_sub_layout(child.layout())
 
@@ -317,7 +341,7 @@ class DataView(QWidget):
         btn_group.setExclusive(True)
         self._quick_filter_groups[col] = btn_group
 
-        values = sorted(df[col].dropna().unique().tolist())
+        values = _sorted_values(df[col].dropna().unique().tolist())
 
         all_btn = QPushButton("Todos")
         all_btn.setCheckable(True)
@@ -365,16 +389,16 @@ class DataView(QWidget):
         """
 
     def _apply_quick_filter(self, column: str, value: str) -> None:
-        if self.pagination_manager is None or self.original_df is None:
+        if self.pagination_manager is None:
             return
         try:
             self.pagination_manager.apply_filter(column, value)
             self.filter_applied.emit(column, value)
-        except Exception as e:
+        except FilterError as e:
             QMessageBox.critical(self, "Error", f"Error al filtrar: {e}")
 
     def _apply_quick_filter_clear(self, column: str) -> None:
-        if self.pagination_manager is None or self.original_df is None:
+        if self.pagination_manager is None:
             return
         self.pagination_manager.clear_filter()
         for col, group in self._quick_filter_groups.items():
@@ -400,8 +424,6 @@ class DataView(QWidget):
     # ------------------------------------------------------------------
 
     def set_data(self, df: pd.DataFrame) -> None:
-        self.original_df = df.copy()
-
         if self.pagination_manager is None:
             self.pagination_manager = PaginationManager(df, self.page_size_spin.value())
             self._connect_pagination_signals()
@@ -412,8 +434,20 @@ class DataView(QWidget):
             self.search_column_combo.clear()
             self.search_column_combo.addItems(df.columns.tolist())
 
-        self._populate_quick_filters(df)
+        try:
+            self._populate_quick_filters(df)
+        except Exception:
+            # Un fallo decorando los filtros no debe impedir cargar la tabla
+            logger.exception("No se pudieron construir los filtros rápidos")
+
         self.update_view()
+
+    @property
+    def original_df(self) -> Optional[pd.DataFrame]:
+        """Dataset base de la vista (propiedad del PaginationManager)."""
+        if self.pagination_manager is None:
+            return None
+        return self.pagination_manager.original_df
 
     def _connect_pagination_signals(self) -> None:
         assert self.pagination_manager is not None
@@ -424,39 +458,33 @@ class DataView(QWidget):
 
     def _connect_model_signals(self) -> None:
         if self.pandas_model is not None:
-            self.pandas_model.layoutChanged.connect(self._on_model_sorted)
+            self.pandas_model.sort_requested.connect(self._on_sort_requested)
 
-    def _on_model_sorted(self) -> None:
-        if self.pandas_model is None or self.pagination_manager is None or self.original_df is None:
-            return
-        if self._sorting_in_progress:
+    def _on_sort_requested(self, column_name: str, ascending: bool) -> None:
+        """Delegar el ordenamiento en el dueño del estado (PaginationManager)."""
+        if self.pagination_manager is None or self._applying_sort:
             return
 
-        self._sorting_in_progress = True
+        self._applying_sort = True
         try:
-            sorted_data = self.pandas_model.get_sorted_data()
-            if len(sorted_data) < len(self.original_df):
-                full_sorted = self.original_df.sort_values(
-                    sorted_data.columns[0], ascending=False
-                )
-            else:
-                full_sorted = sorted_data
-
-            self.pagination_manager.set_data(full_sorted, preserve_page=True)
-            self.original_df = full_sorted.copy()
+            self.pagination_manager.sort_by(column_name, ascending=ascending)
+        except ColumnNotFoundError:
+            return
         finally:
-            self._sorting_in_progress = False
+            self._applying_sort = False
 
     def update_view(self) -> None:
-        if self.pagination_manager is None or self.original_df is None:
-            return
-        if self._sorting_in_progress:
+        if self.pagination_manager is None:
             return
 
         current_page_data = self.pagination_manager.get_page_data()
-        self.pandas_model = VirtualizedPandasModel(current_page_data)
-        self.table_view.setModel(self.pandas_model)
-        self._connect_model_signals()
+
+        if self.pandas_model is None:
+            self.pandas_model = VirtualizedPandasModel(current_page_data)
+            self.table_view.setModel(self.pandas_model)
+            self._connect_model_signals()
+        else:
+            self.pandas_model.update_data(current_page_data)
 
         self._update_page_info()
         self._update_pagination_buttons()
@@ -479,7 +507,7 @@ class DataView(QWidget):
         try:
             self.pagination_manager.apply_filter(column, term)
             self.filter_applied.emit(column, term)
-        except Exception as e:
+        except FilterError as e:
             QMessageBox.critical(self, "Error", f"Error de búsqueda: {e}")
 
     def clear_filter(self) -> None:

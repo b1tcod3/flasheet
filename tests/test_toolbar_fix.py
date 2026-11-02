@@ -1,78 +1,103 @@
 #!/usr/bin/env python3
 """
-Test para verificar que los controladores de la barra de herramientas están corregidos
+Wiring de vistas: registro, coordinador y toolbar deben usar los mismos IDs.
+
+Regresión: la toolbar y los menús usaban índices literales (0, 1, 3) en lugar
+de `ViewRegistry.VIEW_*`, por lo que cambiar el orden de creación de vistas
+rompía la navegación en silencio.
 """
 
-def test_toolbar_indices() -> None:
-    """Test para verificar los índices correctos de la barra de herramientas"""
-    
-    print("TEST: Verificando configuración de índices en la barra de herramientas...")
-    
-    expected_indices = {
-        "Vista Principal": 0,
-        "Vista de Datos": 1,
-        "Vista Cruzar Datos": 2,
-    }
+from PySide6.QtWidgets import QMainWindow
 
-    print("\n📋 Configuración esperada:")
-    for view_name, expected_index in expected_indices.items():
-        print(f"   - Índice {expected_index}: {view_name}")
+from app.toolbar.toolbar_manager import ToolbarManager
+from app.view_manager.view_coordinator import ViewCoordinator
+from app.view_manager.view_registry import ViewRegistry
 
-    print("\n✅ Verificación completada - gráficos eliminados de la aplicación")
-    return True
+ALL_VIEWS = [
+    ViewRegistry.VIEW_MAIN,
+    ViewRegistry.VIEW_DATA,
+    ViewRegistry.VIEW_JOIN,
+    ViewRegistry.VIEW_PIVOT,
+    ViewRegistry.VIEW_PROFILING,
+    ViewRegistry.VIEW_VISUALIZER,
+]
 
-def test_view_mapping() -> None:
-    """Test para verificar el mapeo de vistas"""
-    print("\n🔍 Verificando mapeo de vistas...")
-    
-    with open('app/view_manager/view_coordinator.py', 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    import re
-    
-    factory_pattern = r'self\._stacked_widget\.addWidget\(view\)'
-    has_factory_addwidget = re.search(factory_pattern, content) is not None
 
-    print("📋 Orden de creación de vistas:")
-    if has_factory_addwidget:
-        factory_dict_pattern = r'VIEW_(\w+):\s*self\._create_(\w+)_view'
-        factory_matches = re.findall(factory_dict_pattern, content)
-        expected_factories = [('MAIN', 'main'), ('DATA', 'data'), ('JOIN', 'joined_data')]
-        correct_order = factory_matches == expected_factories
-        for i, (view_id, factory_name) in enumerate(factory_matches):
-            exp_id, exp_name = expected_factories[i] if i < len(expected_factories) else ("N/A", "N/A")
-            status = "✅" if (view_id == exp_id and factory_name == exp_name) else "❌"
-            print(f"   {status} Factory: VIEW_{view_id} → _create_{factory_name}_view")
-    else:
-        correct_order = False
-        print("   ❌ No se encontró patrón de creación de vistas")
-    
-    print(f"\n{'✅ ORDEN CORRECTO' if correct_order else '❌ ORDEN INCORRECTO'}")
-    
-    return correct_order
+class _FakeCoordinator:
+    """Coordinador mínimo: solo registra las llamadas de la toolbar."""
 
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🧪 TEST DE CORRECCIÓN DE CONTROLADORES DE TOOLBAR")
-    print("=" * 60)
-    
-    indices_ok = test_toolbar_indices()
-    mapping_ok = test_view_mapping()
-    
-    print("\n" + "=" * 60)
-    print("📋 RESUMEN FINAL:")
-    print("=" * 60)
-    
-    if indices_ok and mapping_ok:
-        print("🎉 ¡CORRECCIÓN COMPLETADA EXITOSAMENTE!")
-        print("   - Los controladores de la toolbar funcionan correctamente")
-        print("   - Los índices del stacked widget están correctamente alineados")
-        print("   - La funcionalidad de gráficos ha sido eliminada")
-    else:
-        print("❌ LA CORRECCIÓN TIENE PROBLEMAS:")
-        if not indices_ok:
-            print("   - Los índices de los botones están incorrectos")
-        if not mapping_ok:
-            print("   - El orden de creación de vistas está incorrecto")
-    
-    print("=" * 60)
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def mostrar_info(self) -> None:
+        self.calls.append('mostrar_info')
+
+    def auto_pivot(self) -> None:
+        self.calls.append('auto_pivot')
+
+    def exportar_datos_separados(self) -> None:
+        self.calls.append('exportar_datos_separados')
+
+
+def test_registry_has_no_dangling_views() -> None:
+    for view_id in ALL_VIEWS:
+        assert ViewRegistry.is_valid_view(view_id)
+        assert ViewRegistry.get_view_name(view_id) != f"Vista {view_id}"
+
+
+def test_every_registered_view_can_be_shown() -> None:
+    window = QMainWindow()
+    coordinator = ViewCoordinator(window)
+    coordinator.create_views(window)
+
+    for view_id in ALL_VIEWS:
+        assert coordinator.switch_to(view_id) is True
+        assert coordinator.get_current_view() == view_id
+
+
+def test_toolbar_switcher_reaches_data_view() -> None:
+    window = QMainWindow()
+    view_coordinator = ViewCoordinator(window)
+    view_coordinator.create_views(window)
+
+    toolbar = ToolbarManager(window)
+    toolbar.set_coordinators(view_coordinator, _FakeCoordinator())
+    toolbar.create_toolbar()
+
+    assert toolbar.view_switcher is not None
+    toolbar.view_switcher.view_data.emit()
+
+    assert view_coordinator.get_current_view() == ViewRegistry.VIEW_DATA
+
+
+def test_toolbar_pivot_button_requests_pivot() -> None:
+    window = QMainWindow()
+    view_coordinator = ViewCoordinator(window)
+    view_coordinator.create_views(window)
+
+    fake = _FakeCoordinator()
+    toolbar = ToolbarManager(window)
+    toolbar.set_coordinators(view_coordinator, fake)
+    toolbar.create_toolbar()
+
+    assert toolbar.view_switcher is not None
+    toolbar.view_switcher.view_pivot.emit()
+
+    assert fake.calls == ['auto_pivot']
+
+
+def test_toolbar_enables_join_and_separar_with_data() -> None:
+    window = QMainWindow()
+    view_coordinator = ViewCoordinator(window)
+    view_coordinator.create_views(window)
+
+    toolbar = ToolbarManager(window)
+    toolbar.set_coordinators(view_coordinator, _FakeCoordinator())
+    toolbar.create_toolbar()
+
+    toolbar.on_datos_disponibles(False)
+    assert toolbar.separar_btn is not None
+    assert toolbar.separar_btn.isEnabled() is False
+
+    toolbar.on_datos_disponibles(True)
+    assert toolbar.separar_btn.isEnabled() is True

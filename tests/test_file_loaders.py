@@ -10,7 +10,8 @@ from pathlib import Path
 from core.loaders import (
     get_file_loader, 
     is_file_supported, 
-    get_supported_formats
+    get_supported_formats,
+    LoadOptions,
 )
 from core.loaders.csv_loader import CsvLoader
 from core.loaders.json_loader import JsonLoader
@@ -119,14 +120,14 @@ class TestCsvLoader:
     def test_csv_skip_rows(self) -> None:
         """Test loading CSV with skip_rows"""
         loader = CsvLoader(self.csv_file)
-        df = loader.load(skip_rows=1)
+        df = loader.load(LoadOptions(skip_rows=1))
         assert len(df) == 2
         assert not any('Alice' in str(row) for row in df.values)
 
     def test_csv_column_rename(self) -> None:
         """Test loading CSV with column renaming"""
         loader = CsvLoader(self.csv_file)
-        df = loader.load(column_names={'name': 'first_name', 'age': 'years'})
+        df = loader.load(LoadOptions(column_names={'name': 'first_name', 'age': 'years'}))
         assert 'first_name' in df.columns
         assert 'years' in df.columns
         assert 'name' not in df.columns
@@ -144,7 +145,7 @@ class TestCsvLoader:
         loader = CsvLoader(self.csv_file)
         assert loader.can_load_chunks() is True
         
-        df = loader.load_in_chunks(chunk_size=1)
+        df = loader.load_in_chunks(LoadOptions(chunk_size=1))
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 3
 
@@ -228,10 +229,10 @@ class TestDataHandlerIntegration:
         assert '.csv' in formats
 
     def test_is_format_supported_function(self) -> None:
-        """Test is_file_format_supported function"""
-        from core.data_handler import is_file_format_supported
-        assert is_file_format_supported(self.csv_file) is True
-        assert is_file_format_supported('test.txt') is False
+        """Test is_file_supported function"""
+        from core.loaders import is_file_supported
+        assert is_file_supported(self.csv_file) is True
+        assert is_file_supported('test.txt') is False
 
 
 if __name__ == "__main__":

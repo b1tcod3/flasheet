@@ -30,8 +30,9 @@ class FileItemWidget(QFrame):
                 background-color: transparent;
                 border-bottom: 1px solid #e0e0e0;
                 padding: 8px 0px;
+                color: #334155;
             }
-            QLabel { border: none; }
+            QLabel { border: none; color: #334155; }
         """)
         
         layout = QHBoxLayout(self)
@@ -41,8 +42,8 @@ class FileItemWidget(QFrame):
         self.icon_label = QLabel()
         self.icon_label.setFixedSize(32, 32)
         self.icon_label.setStyleSheet("background-color: #f0f4f8; border-radius: 4px;")
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.icon_label.setPixmap(self.style().standardIcon(QStyle.SP_FileIcon).pixmap(20, 20))
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon).pixmap(20, 20))
         layout.addWidget(self.icon_label)
 
         # Contenedor central (Nombre + Progreso)
@@ -86,9 +87,9 @@ class FileItemWidget(QFrame):
 
         # Botón de acción (Cancelar / Eliminar)
         self.action_btn = QPushButton()
-        self.action_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton))
+        self.action_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         self.action_btn.setFixedSize(24, 24)
-        self.action_btn.setCursor(Qt.PointingHandCursor)
+        self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.action_btn.setStyleSheet("""
             QPushButton {
                 border: none;
@@ -121,7 +122,7 @@ class FileItemWidget(QFrame):
         self.progress_bar.hide()
         self.size_label.hide()
         self.percent_label.hide()
-        self.action_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        self.action_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
 
     def set_error(self, message: str = "Error") -> None:
         """Marca el widget como error de carga"""
@@ -130,7 +131,7 @@ class FileItemWidget(QFrame):
         self.size_label.hide()
         self.percent_label.setText(message)
         self.percent_label.setStyleSheet("font-size: 11px; color: #ff4d4f; font-weight: bold;")
-        self.action_btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        self.action_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
 
     def _on_action_clicked(self) -> None:
         if self.is_uploading:
@@ -154,11 +155,12 @@ class RecentFileWidget(QFrame):
                 background-color: transparent;
                 border-bottom: 1px solid #e0e0e0;
                 padding: 6px 0px;
+                color: #334155;
             }
             QFrame:hover { background-color: #f5f7fa; }
-            QLabel { border: none; }
+            QLabel { border: none; color: #334155; }
         """)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 4, 5, 4)
@@ -167,8 +169,8 @@ class RecentFileWidget(QFrame):
         icon_label = QLabel()
         icon_label.setFixedSize(28, 28)
         icon_label.setStyleSheet("background-color: #eef5ff; border-radius: 4px;")
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setPixmap(self.style().standardIcon(QStyle.SP_FileIcon).pixmap(18, 18))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setPixmap(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon).pixmap(18, 18))
         layout.addWidget(icon_label)
 
         text_layout = QVBoxLayout()
@@ -185,7 +187,7 @@ class RecentFileWidget(QFrame):
         layout.addLayout(text_layout, 1)
 
         remove_btn = QPushButton()
-        remove_btn.setIcon(self.style().standardIcon(QStyle.SP_DialogCancelButton))
+        remove_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         remove_btn.setFixedSize(20, 20)
         remove_btn.setStyleSheet("""
             QPushButton { border: none; background: transparent; }
@@ -195,7 +197,7 @@ class RecentFileWidget(QFrame):
         layout.addWidget(remove_btn)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.filepath)
         super().mousePressEvent(event)
 
@@ -243,7 +245,7 @@ class MainView(QWidget):
         """)
         
         drop_layout = QVBoxLayout(self.drop_zone)
-        drop_layout.setAlignment(Qt.AlignCenter)
+        drop_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.setSpacing(15)
 
         # Logo de la aplicación
@@ -251,23 +253,23 @@ class MainView(QWidget):
         logo_path = get_asset_path("logo.png")
         if logo_path.exists():
             pixmap = QPixmap(str(logo_path))
-            scaled_pixmap = pixmap.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_pixmap = pixmap.scaled(128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             logo_label.setPixmap(scaled_pixmap)
         else:
             logo_label.setText("Flash Sheet")
             logo_label.setStyleSheet("font-size: 24px; color: #4a90e2; font-weight: bold;")
-        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(logo_label)
 
         # Flecha de subida
         upload_icon = QLabel("↑")
         upload_icon.setStyleSheet("font-size: 48px; color: #4a90e2; font-weight: bold;")
-        upload_icon.setAlignment(Qt.AlignCenter)
+        upload_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(upload_icon)
 
         # Botón Browse
         self.load_button = QPushButton("Browse")
-        self.load_button.setCursor(Qt.PointingHandCursor)
+        self.load_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.load_button.setStyleSheet("""
             QPushButton {
                 background-color: #4a90e2;
@@ -281,17 +283,17 @@ class MainView(QWidget):
             QPushButton:hover { background-color: #357abd; }
         """)
         self.load_button.clicked.connect(self.load_file)
-        drop_layout.addWidget(self.load_button, alignment=Qt.AlignCenter)
+        drop_layout.addWidget(self.load_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Texto informativo
         drop_label = QLabel("drop a file here")
         drop_label.setStyleSheet("color: #a0a0a0; font-size: 14px;")
-        drop_label.setAlignment(Qt.AlignCenter)
+        drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(drop_label)
 
         support_label = QLabel("*File supported .csv, .xlsx, .json")
         support_label.setStyleSheet("color: #666; font-size: 12px;")
-        support_label.setAlignment(Qt.AlignCenter)
+        support_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         drop_layout.addWidget(support_label)
 
         left_panel.addWidget(self.drop_zone)
@@ -309,13 +311,13 @@ class MainView(QWidget):
         # Scroll Area para la lista
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll_area.setStyleSheet("background: transparent;")
         
         self.files_container = QWidget()
         self.files_container.setStyleSheet("background: transparent;")
         self.files_layout = QVBoxLayout(self.files_container)
-        self.files_layout.setAlignment(Qt.AlignTop)
+        self.files_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.files_layout.setContentsMargins(0, 0, 10, 0)
         
         self.scroll_area.setWidget(self.files_container)
@@ -328,7 +330,7 @@ class MainView(QWidget):
 
         self.recent_scroll_area = QScrollArea()
         self.recent_scroll_area.setWidgetResizable(True)
-        self.recent_scroll_area.setFrameShape(QFrame.NoFrame)
+        self.recent_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self.recent_scroll_area.setMaximumHeight(200)
         self.recent_scroll_area.setStyleSheet("background: transparent;")
         self.recent_scroll_area.hide()
@@ -336,7 +338,7 @@ class MainView(QWidget):
         self.recent_container = QWidget()
         self.recent_container.setStyleSheet("background: transparent;")
         self.recent_layout = QVBoxLayout(self.recent_container)
-        self.recent_layout.setAlignment(Qt.AlignTop)
+        self.recent_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.recent_layout.setContentsMargins(0, 0, 10, 0)
 
         self.recent_scroll_area.setWidget(self.recent_container)

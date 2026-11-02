@@ -43,16 +43,16 @@ class ExcelSheetDialog(QDialog):
         layout.addWidget(self.combo_sheet)
 
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
 
-        ok_btn = self.button_box.button(QDialogButtonBox.Ok)
+        ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
         ok_btn.setText("Aceptar")
         ok_btn.setStyleSheet(
             "background-color: #4f46e5; color: white; border: none;"
         )
 
-        cancel_btn = self.button_box.button(QDialogButtonBox.Cancel)
+        cancel_btn = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)
         cancel_btn.setText("Cancelar")
         cancel_btn.setStyleSheet(
             "background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;"

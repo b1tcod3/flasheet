@@ -1,195 +1,94 @@
 #!/usr/bin/env python3
 """
-Test crítico: Simular exactamente el flujo de main.py con debug profundo
+Flujo crítico: archivo en disco -> carga -> DataView -> tabla.
+
+Antes era un script con QThread y QTimer que solo imprimía el estado. La carga
+en hilo ya está cubierta en `test_file_loaders`/`test_task_thread`; aquí se
+verifica el flujo completo de forma síncrona y con aserciones.
 """
 
-import pandas as pd
-import sys
-import tempfile
 from pathlib import Path
-from typing import Any
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QThread, Signal, QTimer
 
-# Importar módulos exactos de main.py
-from core.data_handler import cargar_datos_con_opciones
+import pandas as pd
+
 from app.widgets.data_view import DataView
+from core.data_handler import cargar_datos_con_opciones
 
-class RealDataLoaderThread(QThread):
-    """Hilo real de carga de datos como en main.py"""
-    data_loaded = Signal(object)
-    error_occurred = Signal(str)
+ROWS = 50
 
-    def __init__(self, filepath: str, skip_rows: int = 0, column_names: dict = None) -> None:
-        super().__init__()
-        self.filepath = filepath
-        self.skip_rows = skip_rows
-        self.column_names = column_names if column_names else {}
 
-    def run(self) -> None:
-        """Ejecutar la carga de datos exactamente como main.py"""
-        print("🔍 REAL: Iniciando carga de datos...")
-        try:
-            df = cargar_datos_con_opciones(self.filepath, self.skip_rows, self.column_names)
-            print(f"✅ REAL: Datos cargados exitosamente: {len(df)} filas, {len(df.columns)} columnas")
-            print(f"   Columnas: {list(df.columns)}")
-            self.data_loaded.emit(df)
-        except Exception as e:
-            print(f"❌ REAL: Error en carga: {str(e)}")
-            self.error_occurred.emit(str(e))
-
-def create_real_test_file() -> pd.DataFrame:
-    """Crear archivo CSV real para probar"""
-    data = {
-        'ID': list(range(1, 51)),  # 50 filas para tener múltiples páginas
-        'Nombre': [f'Empleado_{i:03d}' for i in range(1, 51)],
-        'Edad': [25 + (i % 40) for i in range(50)],
+def build_expected_df() -> pd.DataFrame:
+    return pd.DataFrame({
+        'ID': list(range(1, ROWS + 1)),
+        'Nombre': [f'Empleado_{i:03d}' for i in range(1, ROWS + 1)],
+        'Edad': [25 + (i % 40) for i in range(ROWS)],
         'Departamento': ['Ventas', 'IT', 'RRHH', 'Marketing', 'Finanzas'] * 10,
-        'Salario': [25000 + i * 500 for i in range(50)],
-        'Fecha_Ingreso': pd.date_range('2020-01-01', periods=50, freq='D'),
-        'Activo': [i % 3 == 0 for i in range(50)]
-    }
-    df = pd.DataFrame(data)
-    
-    # Crear archivo temporal
-    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, newline='')
-    df.to_csv(temp_file.name, index=False)
-    temp_file.close()
-    
-    return temp_file.name, df
+        'Salario': [25000 + i * 500 for i in range(ROWS)],
+        'Fecha_Ingreso': pd.date_range('2020-01-01', periods=ROWS, freq='D'),
+        'Activo': [i % 3 == 0 for i in range(ROWS)],
+    })
 
-def test_main_flow() -> None:
-    """Test del flujo principal como en main.py"""
-    print("=== TEST CRÍTICO: Flujo Principal de main.py ===")
-    
-    app = QApplication.instance() or QApplication(sys.argv)
-    
-    # Variables como en main.py
-    data_view = None
-    loading_thread = None
-    df_original = None
-    
-    print("🔍 REAL: Creando DataView...")
+
+def write_csv(path: Path) -> None:
+    build_expected_df().to_csv(path, index=False)
+
+
+def test_load_file_and_populate_data_view(tmp_path: Path) -> None:
+    filepath = tmp_path / 'empleados.csv'
+    write_csv(filepath)
+
+    df = cargar_datos_con_opciones(str(filepath))
+
+    assert len(df) == ROWS
+    assert list(df.columns) == list(build_expected_df().columns)
+
     data_view = DataView()
-    print("✅ REAL: DataView creado")
-    
-    # Verificar estado inicial del DataView
-    print("\n--- ESTADO INICIAL DEL DATAVIEW ---")
-    print(f"   - original_df: {data_view.original_df is not None}")
-    print(f"   - pagination_manager: {data_view.pagination_manager is not None}")
-    print(f"   - pandas_model: {data_view.pandas_model is not None}")
-    print(f"   - table_view modelo: {data_view.table_view.model() is not None if data_view.table_view else False}")
-    
-    print("\n🔍 REAL: Creando archivo de prueba...")
-    filepath, expected_df = create_real_test_file()
-    print(f"✅ REAL: Archivo creado: {filepath}")
-    print(f"   - Filas esperadas: {len(expected_df)}")
-    
-    print("\n🔍 REAL: Iniciando carga asíncrona...")
-    
-    def on_data_loaded(df: pd.DataFrame) -> None:
-        nonlocal data_view, df_original
-        print("\n✅ REAL: Slot on_datos_cargados ejecutado")
-        print(f"   - DataFrame recibido: {len(df)} filas")
-        print(f"   - Columnas: {list(df.columns)}")
-        
-        # Variables como en main.py
-        df_original = df
-        
-        print("   - Estableciendo datos en DataView...")
-        data_view.set_data(df)
-        print("✅ REAL: Datos establecidos en DataView")
-        
-        # Verificar estado después de set_data
-        print("\n--- ESTADO DESPUÉS DE SET_DATA ---")
-        print(f"   - original_df: {len(data_view.original_df)} filas" if data_view.original_df is not None else "   - original_df: None")
-        print(f"   - pagination_manager: {data_view.pagination_manager is not None}")
-        
-        if data_view.pagination_manager is not None:
-            pm = data_view.pagination_manager
-            page_data = pm.get_page_data()
-            print(f"   - Página actual: {pm.get_current_page()}/{pm.get_total_pages()}")
-            print(f"   - Filas en página: {len(page_data)}")
-            if len(page_data) > 0:
-                print(f"   - IDs en página: {page_data['ID'].min()}-{page_data['ID'].max()}")
-        
-        print(f"   - table_view modelo: {data_view.table_view.model() is not None if data_view.table_view else False}")
-        if data_view.table_view and data_view.table_view.model():
-            model = data_view.table_view.model()
-            print(f"   - Filas en modelo: {model.rowCount()}")
-        
-        # Test de navegación manual
-        print("\n🔍 REAL: Probando navegación manual...")
-        if data_view.pagination_manager and data_view.pagination_manager.get_total_pages() > 1:
-            print("   - Navegando a página 2...")
-            data_view.pagination_manager.next_page()
-            
-            if data_view.pagination_manager:
-                page_data = data_view.pagination_manager.get_page_data()
-                print(f"   - Después de navegar: {len(page_data)} filas")
-                if len(page_data) > 0:
-                    print(f"   - IDs después de navegar: {page_data['ID'].min()}-{page_data['ID'].max()}")
-        
-        # Timer para verificar estado después de un tiempo
-        QTimer.singleShot(1000, lambda: verify_final_state(data_view, expected_df))
-        
-    def on_error(error_message: str) -> None:
-        print(f"❌ REAL: Error de carga: {error_message}")
-        
-    # Crear y ejecutar hilo de carga (como main.py)
-    loading_thread = RealDataLoaderThread(filepath)
-    loading_thread.data_loaded.connect(on_data_loaded)
-    loading_thread.error_occurred.connect(on_error)
-    loading_thread.start()
-    
-    print("🔍 REAL: Hilo de carga iniciado, esperando...")
-    
-    # Ejecutar aplicación por un tiempo y luego salir
-    def quit_app() -> None:
-        print("\n🔍 REAL: Finalizando test...")
-        
-        # Limpiar archivo temporal
-        if Path(filepath).exists():
-            Path(filepath).unlink()
-            
-        app.quit()
-        
-    # Timer para salir después de 5 segundos
-    QTimer.singleShot(5000, quit_app)
-    
-    return app.exec()
+    data_view.set_data(df)
 
-def verify_final_state(data_view: Any, expected_df) -> None:
-    """Verificar estado final después de la carga"""
-    print("\n--- VERIFICACIÓN FINAL ---")
-    
-    if data_view.original_df is not None:
-        print(f"✅ DataFrame original: {len(data_view.original_df)} filas")
-    else:
-        print("❌ DataFrame original: None")
-        
-    if data_view.pagination_manager is not None:
-        pm = data_view.pagination_manager
-        page_data = pm.get_page_data()
-        print(f"✅ PaginationManager: Página {pm.get_current_page()}/{pm.get_total_pages()}")
-        print(f"   - Filas en página actual: {len(page_data)}")
-        if len(page_data) > 0:
-            print(f"   - Rango de IDs: {page_data['ID'].min()}-{page_data['ID'].max()}")
-    else:
-        print("❌ PaginationManager: None")
-        
-    if data_view.table_view and data_view.table_view.model():
-        model = data_view.table_view.model()
-        print(f"✅ TableView modelo: {model.rowCount()} filas")
-    else:
-        print("❌ TableView o modelo: None")
+    manager = data_view.pagination_manager
+    assert manager is not None
+    assert manager.get_total_pages() > 1
+    assert data_view.original_df is not None
+    assert len(data_view.original_df) == ROWS
 
-if __name__ == "__main__":
-    print("Iniciando test crítico del flujo de main.py...")
-    try:
-        result = test_main_flow()
-        print(f"Test finalizado con código: {result}")
-    except Exception as e:
-        print(f"❌ Error en test: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    page_data = manager.get_page_data()
+    assert len(page_data) > 0
+    assert data_view.table_view.model() is not None
+    assert data_view.table_view.model().rowCount() == len(page_data)
+
+
+def test_navigation_after_load_keeps_showing_rows(tmp_path: Path) -> None:
+    filepath = tmp_path / 'empleados.csv'
+    write_csv(filepath)
+
+    data_view = DataView()
+    data_view.set_data(cargar_datos_con_opciones(str(filepath)))
+    manager = data_view.pagination_manager
+    assert manager is not None
+
+    first_page_ids = manager.get_page_data()['ID'].tolist()
+    manager.next_page()
+    second_page_ids = manager.get_page_data()['ID'].tolist()
+
+    assert manager.get_current_page() == 2
+    assert len(second_page_ids) > 0
+    assert second_page_ids != first_page_ids
+    assert data_view.pandas_model is not None
+    assert data_view.pandas_model.rowCount() == len(second_page_ids)
+
+
+def test_reload_replaces_data_without_leftovers(tmp_path: Path) -> None:
+    first = tmp_path / 'uno.csv'
+    second = tmp_path / 'dos.csv'
+    write_csv(first)
+    pd.DataFrame({'ID': [1, 2], 'Nombre': ['A', 'B']}).to_csv(second, index=False)
+
+    data_view = DataView()
+    data_view.set_data(cargar_datos_con_opciones(str(first)))
+    data_view.set_data(cargar_datos_con_opciones(str(second)))
+
+    manager = data_view.pagination_manager
+    assert manager is not None
+    assert manager.get_total_rows() == 2
+    assert manager.get_total_pages() == 1
+    assert manager.get_page_data()['ID'].tolist() == [1, 2]

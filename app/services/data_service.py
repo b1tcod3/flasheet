@@ -5,25 +5,28 @@ Servicio centralizado para la gestión de carga, guardado y manipulación
 de datos en Flash View Sheet.
 """
 
+import gc
 from pathlib import Path
 from typing import Any
 import pandas as pd
-from PySide6.QtCore import QThread, Signal, Qt
-from PySide6.QtWidgets import QProgressDialog
+from PySide6.QtCore import Signal
 from core.data_handler import (
     cargar_datos_con_opciones,
     get_supported_file_formats
 )
+from core.loaders import get_format_descriptions
 from core.loaders.folder_loader import FolderLoader
+from app.services.task_thread import TaskThread, stop_thread
 from core.consolidation.excel_consolidator import ExcelConsolidator
+from core.models.folder_load_config import ColumnAlignmentStrategy
 
-class DataLoaderThread(QThread):
+class DataLoaderThread(TaskThread):
     """Hilo para cargar datos en segundo plano"""
-    
+
     data_loaded = Signal(object)
     error_occurred = Signal(str)
     progress_updated = Signal(int, int)
-    
+
     def __init__(self, filepath: str, skip_rows: int = 0, column_names: dict[str, str] | None = None, separator: str | None = None, sheet_name: str | None = None) -> None:
         super().__init__()
         self.filepath = filepath
@@ -31,76 +34,83 @@ class DataLoaderThread(QThread):
         self.column_names = column_names if column_names else {}
         self.separator = separator
         self.sheet_name = sheet_name
-    
-    def run(self) -> None:
-        """Ejecutar la carga de datos"""
-        try:
-            if self.isInterruptionRequested():
-                return
-            self.progress_updated.emit(0, 100)
-            df = cargar_datos_con_opciones(self.filepath, self.skip_rows, self.column_names, separator=self.separator, sheet_name=self.sheet_name)
-            if not self.isInterruptionRequested():
-                self.progress_updated.emit(100, 100)
-                self.data_loaded.emit(df)
-        except Exception as e:
-            if not self.isInterruptionRequested():
-                self.error_occurred.emit(str(e))
 
-class FolderLoaderThread(QThread):
+    def execute(self) -> object:
+        """Cargar el archivo respetando las opciones recibidas."""
+        self.progress_updated.emit(0, 100)
+        df = cargar_datos_con_opciones(
+            self.filepath,
+            self.skip_rows,
+            self.column_names,
+            separator=self.separator,
+            sheet_name=self.sheet_name,
+        )
+        self.progress_updated.emit(100, 100)
+        return df
+
+    def _emit_result(self, result: object) -> None:
+        self.data_loaded.emit(result)
+
+    def _emit_error(self, message: str) -> None:
+        self.error_occurred.emit(message)
+
+
+class FolderLoaderThread(TaskThread):
     """Hilo para cargar y consolidar archivos de una carpeta en segundo plano."""
-    
+
     data_loaded = Signal(object)
     error_occurred = Signal(str)
     progress_updated = Signal(int, int)
-    
+
     def __init__(self, folder_path: str, config: Any | None = None) -> None:
         super().__init__()
         self.folder_path = folder_path
         self.config = config
-    
-    def run(self) -> None:
-        try:
+
+    def execute(self) -> object:
+        """Escanear, seleccionar y consolidar los archivos de la carpeta."""
+        folder_loader = FolderLoader(self.folder_path)
+        all_metadata = folder_loader.get_all_metadata()
+
+        if self.isInterruptionRequested():
+            return None
+
+        selected_files = self._select_files(all_metadata)
+
+        if not selected_files:
+            raise FileNotFoundError("No se encontraron archivos válidos en la carpeta.")
+
+        total_files = len(selected_files)
+        self.progress_updated.emit(0, total_files)
+
+        consolidator = ExcelConsolidator()
+        self._apply_rename_mapping(consolidator)
+
+        def _progress_callback(progress: float) -> None:
             if self.isInterruptionRequested():
-                return
-            
-            folder_loader = FolderLoader(self.folder_path)
-            all_metadata = folder_loader.get_all_metadata()
-            
-            if self.isInterruptionRequested():
-                return
-            
-            selected_files = self._select_files(all_metadata)
-            
-            if not selected_files:
-                self.error_occurred.emit("No se encontraron archivos válidos en la carpeta.")
-                return
-            
-            total_files = len(selected_files)
-            self.progress_updated.emit(0, total_files)
-            
-            consolidator = ExcelConsolidator()
-            self._apply_rename_mapping(consolidator)
-            
-            def _progress_callback(progress: float) -> None:
-                if self.isInterruptionRequested():
-                    raise InterruptedError("Thread interrupted")
-                current = int(progress / 100 * total_files)
-                self.progress_updated.emit(current, total_files)
-            
-            consolidated_df = consolidator.consolidate_chunked(
-                selected_files,
-                alignment_method='position',
-                chunk_size=10,
-                progress_callback=_progress_callback
-            )
-            
-            self.progress_updated.emit(total_files, total_files)
-            
-            if not self.isInterruptionRequested():
-                self.data_loaded.emit(consolidated_df)
-        except Exception as e:
-            if not self.isInterruptionRequested():
-                self.error_occurred.emit(str(e))
+                raise InterruptedError("Thread interrupted")
+            current = int(progress / 100 * total_files)
+            self.progress_updated.emit(current, total_files)
+
+        alignment_strategy = getattr(
+            self.config, 'alignment_strategy', ColumnAlignmentStrategy.BY_POSITION
+        )
+
+        consolidated_df = consolidator.consolidate_chunked(
+            selected_files,
+            alignment=alignment_strategy,
+            chunk_size=10,
+            progress_callback=_progress_callback
+        )
+
+        self.progress_updated.emit(total_files, total_files)
+        return consolidated_df
+
+    def _emit_result(self, result: object) -> None:
+        self.data_loaded.emit(result)
+
+    def _emit_error(self, message: str) -> None:
+        self.error_occurred.emit(message)
 
     def _select_files(self, all_metadata: list[dict[str, Any]]) -> list[str]:
         if self.config and hasattr(self.config, 'should_include_file'):
@@ -130,29 +140,8 @@ class DataService:
         self.df_vista_actual: pd.DataFrame | None = None
         self.loading_thread: DataLoaderThread | None = None
         self.folder_loading_thread: FolderLoaderThread | None = None
-        self.progress_dialog: QProgressDialog | None = None
         self._active_threads: list[DataLoaderThread] = []
-        
-        # Formatos soportados
-        self._format_descriptions: dict[str, str] = {
-            '.xlsx': 'Archivos de Excel',
-            '.xls': 'Archivos de Excel Legacy',
-            '.csv': 'Archivos CSV',
-            '.tsv': 'Archivos TSV',
-            '.json': 'Archivos JSON',
-            '.xml': 'Archivos XML',
-            '.parquet': 'Archivos Parquet',
-            '.feather': 'Archivos Feather',
-            '.hdf5': 'Archivos HDF5',
-            '.h5': 'Archivos HDF5',
-            '.pkl': 'Archivos Pickle',
-            '.pickle': 'Archivos Pickle',
-            '.db': 'Bases de Datos SQLite',
-            '.sqlite': 'Bases de Datos SQLite',
-            '.sqlite3': 'Bases de Datos SQLite',
-            '.yaml': 'Archivos YAML',
-            '.yml': 'Archivos YAML',
-        }
+        self.current_source: str | None = None
     
     @property
     def has_data(self) -> bool:
@@ -172,23 +161,26 @@ class DataService:
     def get_file_filter(self) -> str:
         """Obtener filtro de archivos para diálogos de apertura"""
         supported_formats = get_supported_file_formats()
-        
-        format_filters = []
-        for ext in supported_formats:
-            if ext in self._format_descriptions:
-                format_filters.append(f"{self._format_descriptions[ext]} (*{ext})")
-        
+        descriptions = get_format_descriptions()
+
+        format_filters = [
+            f"{descriptions[ext]} (*{ext})"
+            for ext in supported_formats
+            if ext in descriptions
+        ]
+
         # Añadir filtro de "Todos los soportados"
-        all_extensions = " ".join([f"*{ext}" for ext in supported_formats])
+        all_extensions = " ".join(f"*{ext}" for ext in supported_formats)
         all_formats = f"Todos los archivos soportados ({all_extensions})"
         format_filters.insert(0, all_formats)
-        
+
         return ";;".join(format_filters)
     
     def create_loader_thread(self, filepath: str, skip_rows: int = 0, column_names: dict[str, str] | None = None, separator: str | None = None, sheet_name: str | None = None) -> DataLoaderThread:
         """Crear un hilo de carga de datos"""
         thread = DataLoaderThread(filepath, skip_rows, column_names, separator, sheet_name)
         self.loading_thread = thread
+        self.current_source = filepath
         self._active_threads.append(thread)
         thread.finished.connect(
             lambda t=thread: self._active_threads.remove(t) if t in self._active_threads else None
@@ -201,21 +193,8 @@ class DataService:
     def create_folder_loader_thread(self, folder_path: str, config: Any | None = None) -> FolderLoaderThread:
         """Crear un hilo de carga de carpeta"""
         self.folder_loading_thread = FolderLoaderThread(folder_path, config)
+        self.current_source = folder_path
         return self.folder_loading_thread
-    
-    def create_progress_dialog(self, title: str = "Cargando datos", label: str = "Cargando archivo...") -> QProgressDialog:
-        """Crear un diálogo de progreso"""
-        self.close_progress_dialog()
-        self.progress_dialog = QProgressDialog(label, "Cancelar", 0, 100)
-        self.progress_dialog.setWindowTitle(title)
-        self.progress_dialog.setWindowModality(Qt.WindowModal)
-        return self.progress_dialog
-
-    def close_progress_dialog(self) -> None:
-        """Cerrar el diálogo de progreso si existe"""
-        if self.progress_dialog:
-            self.progress_dialog.close()
-            self.progress_dialog = None
     
     def set_current_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Establecer datos actuales"""
@@ -231,8 +210,7 @@ class DataService:
         """Reset data state without stopping threads or closing dialogs."""
         self.df_original = None
         self.df_vista_actual = None
-        # TODO: Emitir señal (ej. datos_disponibles(False)) para deshabilitar menús/toolbar
-        import gc
+        self.current_source = None
         gc.collect()
 
     @staticmethod
@@ -242,23 +220,21 @@ class DataService:
     
     def get_column_names(self) -> list[str]:
         """Obtener nombres de columnas"""
-        if self.df_vista_actual is not None:
-            return self.df_vista_actual.columns.tolist()
-        return []
+        if self.df_vista_actual is None:
+            return []
+        columns: list[str] = list(self.df_vista_actual.columns)
+        return columns
     
     def get_data_shape(self) -> tuple[int, int]:
         """Obtener forma de los datos actuales"""
-        if self.df_vista_actual is not None:
-            return self.df_vista_actual.shape
-        return (0, 0)
+        if self.df_vista_actual is None:
+            return (0, 0)
+        shape: tuple[int, int] = self.df_vista_actual.shape
+        return shape
     
     def get_filepath(self) -> str | None:
         """Obtener ruta del archivo o carpeta cargada"""
-        if self.loading_thread:
-            return self.loading_thread.filepath
-        if self.folder_loading_thread:
-            return self.folder_loading_thread.folder_path
-        return None
+        return self.current_source
     
     def get_filename(self) -> str:
         """Obtener nombre del archivo cargado"""
@@ -269,34 +245,21 @@ class DataService:
     
     def cleanup(self) -> None:
         """Libera agresivamente la memoria de los DataFrames cargados."""
-        # 1. Detener hilos activos
+        # 1. Detener hilos activos (cancelación cooperativa)
         for thread in self._active_threads[:]:
-            if thread.isRunning():
-                thread.requestInterruption()
-                thread.quit()
-                if not thread.wait(2000):
-                    thread.terminate()
-                    thread.wait(1000)
+            stop_thread(thread)
         self._active_threads.clear()
 
         threads: tuple[DataLoaderThread | FolderLoaderThread | None, ...] = (self.loading_thread, self.folder_loading_thread)
         for active_thread in threads:
-            if active_thread and active_thread.isRunning():
-                active_thread.requestInterruption()
-                active_thread.quit()
-                if not active_thread.wait(2000):
-                    active_thread.terminate()
-                    active_thread.wait(1000)
+            stop_thread(active_thread)
 
-        # 2. Cerrar diálogo de progreso
-        self.close_progress_dialog()
-
-        # 3. Sobrescribir DataFrames pesados
+        # 2. Sobrescribir DataFrames pesados
         self.df_original = None
         self.df_vista_actual = None
+        self.current_source = None
 
-        # 4. Forzar recolección de basura
-        import gc
+        # 3. Forzar recolección de basura
         gc.collect()
 
         # 5. Liberar referencias a hilos

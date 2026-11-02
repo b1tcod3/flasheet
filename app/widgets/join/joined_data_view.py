@@ -83,6 +83,7 @@ class JoinedDataView(DataView):
                 padding: 5px;
                 font-family: monospace;
                 font-size: 10px;
+                color: #1e293b;
             }
         """)
         layout.addWidget(self.metadata_text)
@@ -215,13 +216,13 @@ class JoinedDataView(DataView):
             if not entry.success:
                 item_text += " (ERROR)"
             item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, entry.entry_id)
+            item.setData(Qt.ItemDataRole.UserRole, entry.entry_id)
             list_widget.addItem(item)
 
         def on_item_selected() -> None:
             current_item = list_widget.currentItem()
             if current_item:
-                entry_id = current_item.data(Qt.UserRole)
+                entry_id = current_item.data(Qt.ItemDataRole.UserRole)
                 self._show_entry_details(entries, entry_id, details_text)
 
         list_widget.itemSelectionChanged.connect(on_item_selected)
@@ -256,9 +257,9 @@ Memoria: {entry.result_metadata.get('memory_usage', 'N/A'):.1f} MB
         reply = QMessageBox.question(
             self, "Confirmar",
             "¿Está seguro de que desea limpiar todo el historial de operaciones de cruce?",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.history_clear_requested.emit()
             QMessageBox.information(self, "Éxito", "Historial limpiado.")
             dialog.accept()
