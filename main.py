@@ -118,12 +118,18 @@ class MainWindow(ShellWindow):
         # Cambios de vista iniciados por la app (carga, join, pivote…)
         self.view_coordinator.get_view_switcher().view_changed.connect(self._on_view_changed)
 
-        # Datos
+        # Datos: el coordinador avisa y las vistas se actualizan
+        self.coordinator.datos_originales_cargados.connect(
+            self.view_coordinator.on_datos_originales_cargados)
+        self.coordinator.datos_actualizados.connect(
+            self.view_coordinator.on_datos_actualizados)
         self.coordinator.datos_disponibles.connect(self._on_data_available)
 
         data_view = self.view_coordinator.get_data_view()
         if data_view is not None:
             data_view.data_updated.connect(self._on_data_updated)
+            data_view.filter_applied.connect(self.coordinator.on_filter_applied)
+            data_view.filter_cleared.connect(self.coordinator.on_filter_cleared)
 
         # Vistas que emiten acciones
         main_view = self.view_coordinator.get_main_view()

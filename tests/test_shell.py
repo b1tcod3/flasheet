@@ -183,3 +183,79 @@ class TestMainWindowIntegration:
             assert expected in sequences
 
         window.close()
+
+
+class TestLoadingFlow:
+    """El cableado señal -> vista debe poblar la tabla al cargar un archivo."""
+
+    @staticmethod
+    def _window():  # type: ignore[no-untyped-def]
+        from PySide6.QtWidgets import QApplication
+
+        from app.theme import apply_theme
+        import main
+
+        apply_theme(QApplication.instance(), 'dark')
+        window = main.MainWindow()
+        window.show()
+        return window
+
+    def test_loading_file_populates_table(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        import pandas as pd
+        from PySide6.QtWidgets import QApplication
+
+        from app.view_manager import ViewRegistry
+
+        window = self._window()
+        app = QApplication.instance()
+
+        csv_path = tmp_path / 'datos.csv'
+        pd.DataFrame({
+            'A': list(range(1, 31)),
+            'B': [f'x{i}' for i in range(30)],
+        }).to_csv(csv_path, index=False)
+
+        window.coordinator.iniciar_carga_archivo(str(csv_path))
+
+        thread = window.coordinator._loader_thread
+        assert thread is not None
+        assert thread.wait(8000) is True, 'la carga no terminó'
+
+        for _ in range(5):
+            app.processEvents()
+
+        data_view = window.view_coordinator.get_data_view()
+        assert data_view is not None
+        assert data_view.pagination_manager is not None, 'la vista no recibió los datos'
+        assert data_view.original_df is not None
+        assert len(data_view.original_df) == 30
+        assert data_view.pagination_manager.get_total_pages() == 3
+
+        model = data_view.table_view.model()
+        assert model is not None
+        assert model.rowCount() == 10
+
+        assert window.view_coordinator.get_current_view() == ViewRegistry.VIEW_DATA
+        assert window.side_bar.active_page() == ViewRegistry.VIEW_DATA
+        assert '30 filas' in window.rows_label.text()
+
+        window.close()
+
+    def test_datasets_signals_are_connected(self) -> None:
+        """Regresión: sin estas conexiones la tabla queda vacía."""
+        window = self._window()
+        coordinator = window.coordinator
+        view_coordinator = window.view_coordinator
+
+        # Emitir datos_actualizados debe llegar a DataView.set_data
+        import pandas as pd
+
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': ['x', 'y', 'z']})
+        coordinator.datos_actualizados.emit(df)
+
+        data_view = view_coordinator.get_data_view()
+        assert data_view is not None
+        assert data_view.pagination_manager is not None
+        assert len(data_view.original_df) == 3
+
+        window.close()
