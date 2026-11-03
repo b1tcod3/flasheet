@@ -172,3 +172,57 @@ class TestViewThemeRefresh:
         coordinator.refresh_theme()
 
         assert fake.calls == 1
+
+
+class TestTableStyle:
+    """La tabla sigue la estructura de BreezeStyleSheets con la paleta propia."""
+
+    def test_table_has_no_outer_border(self) -> None:
+        qss = render_stylesheet('dark')
+        block = qss.split('QTableView {')[1].split('}')[0]
+
+        assert 'border: none' in block
+        assert 'gridline-color' in block
+
+    def test_header_sections_avoid_double_borders(self) -> None:
+        qss = render_stylesheet('dark')
+
+        assert 'QHeaderView::section::horizontal' in qss
+        assert 'QHeaderView::section::vertical' in qss
+        assert 'border-left: transparent' in qss
+        assert 'border-top: transparent' in qss
+
+    def test_selection_has_active_and_inactive_states(self) -> None:
+        qss = render_stylesheet('dark')
+
+        assert 'QTableView::item:selected:active' in qss
+        assert 'QTableView::item:selected:!active' in qss
+        assert 'QTableView::item:!selected:hover' in qss
+
+    def test_sorted_column_and_hover_are_styled(self) -> None:
+        qss = render_stylesheet('dark')
+
+        assert 'QHeaderView::section:checked' in qss
+        assert 'QHeaderView::section:hover' in qss
+        assert 'showSortIndicator' in qss
+
+    def test_corner_button_is_styled(self) -> None:
+        assert 'QTableCornerButton::section' in render_stylesheet('dark')
+
+    def test_sort_arrows_exist_and_use_theme_color(self) -> None:
+        from pathlib import Path
+
+        for theme, palette in (('dark', DARK), ('light', LIGHT)):
+            qss = render_stylesheet(theme)
+            lines = [line for line in qss.splitlines() if 'sort_down' in line]
+
+            assert lines, f'sin flecha de orden en {theme}'
+            path = Path(lines[0].split('url(')[1].rstrip(');'))
+
+            assert path.exists(), f'no se generó {path}'
+            assert palette.accent in path.read_text(encoding='utf-8')
+
+    def test_alternating_rows_are_kept(self) -> None:
+        qss = render_stylesheet('dark')
+
+        assert 'alternate-background-color' in qss

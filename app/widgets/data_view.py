@@ -130,11 +130,18 @@ class DataView(QWidget):
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_view.setSortingEnabled(True)
         self.table_view.setShowGrid(False)
+        self.table_view.setWordWrap(False)
         self.table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         header = self.table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         header.setStretchLastSection(True)
+        header.setHighlightSections(True)
+        header.setMinimumSectionSize(80)
+
+        vertical = self.table_view.verticalHeader()
+        vertical.setDefaultSectionSize(28)
+        vertical.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
 
 
         parent_layout.addWidget(self.table_view, 1)
@@ -314,6 +321,10 @@ class DataView(QWidget):
             logger.exception("No se pudieron construir los filtros rápidos")
 
         self.update_view()
+
+        # Ajustar anchos una sola vez por dataset (usa solo la página visible)
+        if len(df.columns) <= 50:
+            self.table_view.resizeColumnsToContents()
 
     @property
     def original_df(self) -> Optional[pd.DataFrame]:

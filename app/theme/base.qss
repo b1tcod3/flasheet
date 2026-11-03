@@ -300,46 +300,118 @@ QPushButton#primaryBtn:disabled {
     color: $text_muted;
 }
 
-/* ---------- Tabla ---------- */
+/* ---------- Tabla (estructura Breeze, paleta Dracula) ----------
+   Inspirado en BreezeStyleSheets (MIT, Colin Duquesnoy / Alex Huszagh):
+   sin borde exterior, separadores sin duplicar y flechas de orden propias. */
+
 QTableView {
     background-color: $app_bg;
     alternate-background-color: $menu_bg;
-    color: $text;
+    border: none;
+    border-radius: 0px;
     gridline-color: $border;
-    border: 1px solid $border;
-    border-radius: 6px;
-    selection-background-color: $surface;
-    selection-color: $accent;
     outline: none;
+    selection-background-color: transparent;
+    selection-color: $text;
 }
 
 QTableView::item {
-    padding: 6px 8px;
-    border-bottom: 1px solid $border;
+    color: $text;
+    padding: 0.13em 0.35em;
+    border: none;
 }
 
-QTableView::item:selected {
+QTableView::item:!selected:hover {
     background-color: $surface;
-    color: $accent;
+    color: $text;
+}
+
+QTableView::item:selected:active {
+    background-color: $accent;
+    color: $menu_bg;
+}
+
+QTableView::item:selected:!active {
+    background-color: $surface;
+    color: $text;
+}
+
+QTableView::item:selected:hover {
+    background-color: $accent_pink;
+    color: $menu_bg;
+}
+
+QHeaderView {
+    background-color: $menu_bg;
+    border: none;
+    margin: 0em;
+    padding: 0em;
 }
 
 QHeaderView::section {
     background-color: $menu_bg;
     color: $text;
-    border: none;
-    border-right: 1px solid $border;
-    border-bottom: 1px solid $border;
-    padding: 7px 8px;
+    border: 1px solid $border;
+    border-radius: 0px;
+    padding: 0.23em 0.35em;
+    text-align: center;
     font-weight: 600;
 }
 
-QHeaderView::section:hover {
+/* Bordes compartidos: cada sección dibuja solo su lado derecho/inferior */
+QHeaderView::section::horizontal {
+    border-left: transparent;
+}
+
+QHeaderView::section::horizontal::first,
+QHeaderView::section::horizontal::only-one {
+    border-left: 1px solid $border;
+}
+
+QHeaderView::section::vertical {
+    border-top: transparent;
+}
+
+QHeaderView::section::vertical::first,
+QHeaderView::section::vertical::only-one {
+    border-top: 1px solid $border;
+}
+
+QHeaderView::section:checked {
     background-color: $surface;
+    color: $accent;
+}
+
+QHeaderView::section:hover {
+    border: 1px solid $accent;
+}
+
+QHeaderView[showSortIndicator="true"]::section::horizontal {
+    padding-right: 0.9em;
+}
+
+QHeaderView::down-arrow {
+    image: url($sort_down);
+    subcontrol-origin: content;
+    subcontrol-position: center right;
+    width: 0.8em;
+    height: 0.5em;
+}
+
+QHeaderView::up-arrow {
+    image: url($sort_up);
+    subcontrol-origin: content;
+    subcontrol-position: center right;
+    width: 0.8em;
+    height: 0.5em;
 }
 
 QTableCornerButton::section {
     background-color: $menu_bg;
     border: none;
+    border-right: 1px solid $border;
+    border-bottom: 1px solid $border;
+    border-radius: 0px;
 }
 
 /* ---------- Pestañas ---------- */

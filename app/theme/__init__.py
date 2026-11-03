@@ -8,6 +8,7 @@ hay colores hardcodeados en los widgets del shell.
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from string import Template
 
@@ -17,6 +18,8 @@ from PySide6.QtWidgets import QApplication
 from app.theme.palette import PALETTES, ThemePalette, get_palette
 
 _QSS_PATH = Path(__file__).resolve().parent / 'base.qss'
+_ICONS_DIR = Path(__file__).resolve().parent / 'icons'
+_SVG_CACHE_DIR = Path(tempfile.gettempdir()) / 'flashsheet-theme'
 _current_theme = 'dark'
 
 
@@ -33,12 +36,38 @@ def _read_template() -> Template:
     return Template(_QSS_PATH.read_text(encoding='utf-8'))
 
 
+
+def _themed_svg(name: str, color: str) -> str:
+    """Generar el SVG del indicador de orden con el color del tema.
+
+    QSS no permite variables en `url()`, así que se escribe una copia
+    coloreada en un directorio de caché y se referencia por ruta absoluta.
+    """
+    template = _ICONS_DIR / f'{name}.svg.tmpl'
+    if not template.exists():
+        return ''
+
+    target = _SVG_CACHE_DIR / f'{name}-{color.lstrip("#")}.svg'
+    try:
+        if not target.exists():
+            _SVG_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                template.read_text(encoding='utf-8').replace('@COLOR@', color),
+                encoding='utf-8',
+            )
+    except OSError:
+        return ''
+    return target.as_posix()
+
+
 def render_stylesheet(theme: str = 'dark') -> str:
-    """Resolver la plantilla QSS con los colores del tema."""
+    """Resolver la plantilla QSS con los colores y los SVG del tema."""
     palette = get_palette(theme)
     tokens = {
         key: value for key, value in vars(palette).items() if isinstance(value, str)
     }
+    tokens['sort_down'] = _themed_svg('sort_down', palette.accent)
+    tokens['sort_up'] = _themed_svg('sort_up', palette.accent)
     return _read_template().substitute(tokens)
 
 

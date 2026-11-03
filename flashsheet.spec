@@ -50,6 +50,8 @@ hiddenimports += collect_submodules('pyarrow')
 datas = [
     (str(ASSETS_DIR), 'assets'),
     (str(PROJECT_ROOT / 'app' / 'theme' / 'base.qss'), 'app/theme'),
+    # Plantillas SVG de las flechas de orden (se colorean en runtime)
+    (str(PROJECT_ROOT / 'app' / 'theme' / 'icons'), 'app/theme/icons'),
 ]
 datas += collect_data_files('reportlab')
 
