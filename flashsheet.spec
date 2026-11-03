@@ -19,7 +19,7 @@ Motivos de las opciones (ver reglas del skill pyside6-desktop):
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 PROJECT_ROOT = Path(SPECPATH).resolve()
 ASSETS_DIR = PROJECT_ROOT / 'assets'
@@ -47,6 +47,28 @@ hiddenimports = [
 hiddenimports += collect_submodules('matplotlib.backends')
 hiddenimports += collect_submodules('pyarrow')
 
+# numpy y pandas: extensiones compiladas (.pyd/.so) y DLLs auxiliares.
+# El hook de PyInstaller las recoge, pero al compilar desde rutas de red/WSL
+# (\\wsl.localhost\...) puede fallar en silencio y el .exe arranca con
+# "Error importing numpy ... source directory". Se fuerza su inclusión.
+numpy_datas, numpy_binaries, numpy_hidden = collect_all('numpy')
+pandas_datas, pandas_binaries, pandas_hidden = collect_all('pandas')
+
+_NO_TESTS = ['**/tests/**', '**/*.pyi']
+datas += collect_data_files('numpy', excludes=_NO_TESTS)
+datas += collect_data_files('pandas', excludes=_NO_TESTS)
+binaries = numpy_binaries + pandas_binaries
+hiddenimports += numpy_hidden + pandas_hidden
+hiddenimports += [
+    # Por si el grafo de imports no las resuelve (numpy 1.x y 2.x)
+    'numpy._core._multiarray_umath',
+    'numpy.core._multiarray_umath',
+    'numpy.linalg._umath_linalg',
+    'numpy.fft._pocketfft_internal',
+    'pandas._libs.lib',
+    'pandas._libs.tslibs.base',
+]
+
 datas = [
     (str(ASSETS_DIR), 'assets'),
     (str(PROJECT_ROOT / 'app' / 'theme' / 'base.qss'), 'app/theme'),
@@ -58,7 +80,7 @@ datas += collect_data_files('reportlab')
 a = Analysis(
     ['main.py'],
     pathex=[str(PROJECT_ROOT)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -94,8 +116,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=['vcruntime140.dll', 'python3*.dll', 'Qt6*.dll'],
+    # UPX desactivado: comprimir las .pyd de numpy/pandas provoca errores de
+    # carga en runtime ("Error importing numpy"). El tamaño sube, la fiabilidad también.
+    upx=False,
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
