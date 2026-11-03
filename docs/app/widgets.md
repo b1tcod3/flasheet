@@ -268,7 +268,7 @@ Ambos muestran: Información General (filas/columnas), Columnas (lista con dtype
 
 ```python
 class AboutDialog(QDialog):
-    VERSION = "1.1.0"
+    VERSION = __version__  # app/version.py
     AUTHOR = "b1tcod3"
     GITHUB_URL = "https://github.com/b1tcod3"
     @classmethod

@@ -9,11 +9,12 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from pathlib import Path
+from app.version import __version__
 
 class AboutDialog(QDialog):
     """Diálogo modal para mostrar información Acerca de"""
     
-    VERSION = "1.1.0"
+    VERSION = __version__
     AUTHOR = "b1tcod3"
     GITHUB_URL = "https://github.com/b1tcod3"
     

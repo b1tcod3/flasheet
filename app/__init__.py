@@ -19,7 +19,7 @@ from app.widgets import (
     DataView,
 )
 
-__version__ = "1.1.0"
+from app.version import __version__  # noqa: E402  (única fuente de verdad)
 
 __all__ = [
     # Servicios
