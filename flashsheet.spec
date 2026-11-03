@@ -55,8 +55,6 @@ numpy_datas, numpy_binaries, numpy_hidden = collect_all('numpy')
 pandas_datas, pandas_binaries, pandas_hidden = collect_all('pandas')
 
 _NO_TESTS = ['**/tests/**', '**/*.pyi']
-datas += collect_data_files('numpy', excludes=_NO_TESTS)
-datas += collect_data_files('pandas', excludes=_NO_TESTS)
 binaries = numpy_binaries + pandas_binaries
 hiddenimports += numpy_hidden + pandas_hidden
 hiddenimports += [
@@ -76,6 +74,8 @@ datas = [
     (str(PROJECT_ROOT / 'app' / 'theme' / 'icons'), 'app/theme/icons'),
 ]
 datas += collect_data_files('reportlab')
+datas += collect_data_files('numpy', excludes=_NO_TESTS)
+datas += collect_data_files('pandas', excludes=_NO_TESTS)
 
 a = Analysis(
     ['main.py'],
