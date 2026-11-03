@@ -8,6 +8,7 @@ hay colores hardcodeados en los widgets del shell.
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 from string import Template
@@ -21,6 +22,8 @@ _QSS_PATH = Path(__file__).resolve().parent / 'base.qss'
 _ICONS_DIR = Path(__file__).resolve().parent / 'icons'
 _SVG_CACHE_DIR = Path(tempfile.gettempdir()) / 'flashsheet-theme'
 _current_theme = 'dark'
+
+logger = logging.getLogger(__name__)
 
 
 def current_theme() -> str:
@@ -68,7 +71,15 @@ def render_stylesheet(theme: str = 'dark') -> str:
     }
     tokens['sort_down'] = _themed_svg('sort_down', palette.accent)
     tokens['sort_up'] = _themed_svg('sort_up', palette.accent)
-    return _read_template().substitute(tokens)
+
+    try:
+        template = _read_template()
+    except OSError:
+        # Bundle sin la hoja de estilos: la app sigue arrancando con la paleta.
+        logger.warning("No se encontró base.qss; se aplica solo la paleta del tema")
+        return ''
+
+    return template.substitute(tokens)
 
 
 def build_palette(theme: str = 'dark') -> QPalette:

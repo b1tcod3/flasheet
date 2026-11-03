@@ -226,3 +226,18 @@ class TestTableStyle:
         qss = render_stylesheet('dark')
 
         assert 'alternate-background-color' in qss
+
+
+def test_missing_stylesheet_does_not_break_startup(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Un bundle sin base.qss debe arrancar con la paleta, sin excepción."""
+    from pathlib import Path
+
+    import app.theme as theme_module
+
+    monkeypatch.setattr(theme_module, '_QSS_PATH', Path('/no/existe/base.qss'))
+
+    app = QApplication.instance() or QApplication([])
+    theme_module.apply_theme(app, 'dark')
+
+    assert app.styleSheet() == ''
+    assert app.palette().color(QPalette.ColorRole.Window).name() == DARK.app_bg
